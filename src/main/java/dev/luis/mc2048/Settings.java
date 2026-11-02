@@ -1,6 +1,7 @@
 package dev.luis.mc2048;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Color;
 import org.bukkit.Material;
@@ -12,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
 public final class Settings {
 
@@ -29,6 +31,10 @@ public final class Settings {
 
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.builder()
             .character('&').hexColors().build();
+    private static final TextReplacementConfig KEYBINDS = TextReplacementConfig.builder()
+            .match(Pattern.compile("\\{(key\\.[a-z.]+)}"))
+            .replacement((match, builder) -> Component.keybind(match.group(1)))
+            .build();
 
     public final int size;
     public final int startTiles;
@@ -37,15 +43,10 @@ public final class Settings {
     public final int undoCooldown;
 
     public final double distance;
-    public final int heightAboveGround;
-    public final double backGap;
-    public final int attachDelay;
     public final BlockData boxBlock;
-    public final int boxSide;
+    public final int boxRadius;
     public final int boxUp;
     public final int boxDown;
-    public final int boxFront;
-    public final int boxBack;
 
     public final int slideTicks;
     public final int popTicks;
@@ -69,6 +70,8 @@ public final class Settings {
     public final double undoTextHeight;
     public final Area restart;
     public final double restartTextHeight;
+    public final Area leave;
+    public final double leaveTextHeight;
     public final Color buttonColor;
     public final Color buttonHover;
     public final Color buttonDisabled;
@@ -105,16 +108,11 @@ public final class Settings {
         undoCooldown = config.getInt("game.undo-cooldown");
 
         distance = config.getDouble("camera.distance");
-        heightAboveGround = config.getInt("camera.height-above-ground");
-        backGap = config.getDouble("camera.back-gap");
-        attachDelay = Math.max(1, config.getInt("camera.attach-delay-ticks"));
         Material block = Material.matchMaterial(config.getString("camera.box.block", ""));
         boxBlock = (block != null && block.isBlock() ? block : Material.BLACK_CONCRETE).createBlockData();
-        boxSide = config.getInt("camera.box.side");
+        boxRadius = config.getInt("camera.box.radius");
         boxUp = config.getInt("camera.box.up");
         boxDown = config.getInt("camera.box.down");
-        boxFront = config.getInt("camera.box.front");
-        boxBack = config.getInt("camera.box.back");
 
         slideTicks = config.getInt("animation.slide-ticks");
         popTicks = config.getInt("animation.pop-ticks");
@@ -139,6 +137,8 @@ public final class Settings {
         undoTextHeight = layout.getDouble("undo.text-height");
         restart = area(layout.getConfigurationSection("restart"));
         restartTextHeight = layout.getDouble("restart.text-height");
+        leave = area(layout.getConfigurationSection("leave"));
+        leaveTextHeight = layout.getDouble("leave.text-height");
         buttonColor = color(layout.getString("button.color"));
         buttonHover = color(layout.getString("button.hover"));
         buttonDisabled = color(layout.getString("button.disabled"));
@@ -189,7 +189,7 @@ public final class Settings {
     }
 
     public Component text(String path) {
-        return LEGACY.deserialize(messages.getString(path, ""));
+        return LEGACY.deserialize(messages.getString(path, "")).replaceText(KEYBINDS);
     }
 
     public Component text(String path, String placeholder, Object value) {

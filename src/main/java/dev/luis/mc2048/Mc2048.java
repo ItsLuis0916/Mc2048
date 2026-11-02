@@ -8,7 +8,9 @@ import org.bukkit.event.Cancellable;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
@@ -85,7 +87,7 @@ public final class Mc2048 extends JavaPlugin implements Listener {
             if (!Boolean.TRUE.equals(found)) game.restart(settings.startTiles);
             Session session = new Session(this, settings, player, game);
             sessions.put(uuid, session);
-            session.open();
+            if (!session.open()) sessions.remove(uuid, session);
         }, () -> opening.remove(uuid)));
     }
 
@@ -113,7 +115,23 @@ public final class Mc2048 extends JavaPlugin implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInteract(PlayerInteractEvent event) {
-        block(event);
+        Session session = session(event.getPlayer());
+        if (session == null) return;
+        event.setCancelled(true);
+        if (event.getClickedBlock() != null) session.refake(event.getClickedBlock());
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onBreak(BlockBreakEvent event) {
+        Session session = session(event.getPlayer());
+        if (session == null) return;
+        event.setCancelled(true);
+        session.refake(event.getBlock());
+    }
+
+    @EventHandler
+    public void onDismount(EntityDismountEvent event) {
+        if (event.getEntity() instanceof Player player) close(player);
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

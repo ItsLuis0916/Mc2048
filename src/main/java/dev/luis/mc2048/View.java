@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 
 final class View {
 
-    enum Action { UNDO, RESTART, KEEP_GOING }
+    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE }
 
     enum Overlay { NONE, WON, OVER }
 
@@ -50,18 +50,37 @@ final class View {
     private static final int FLOAT = 5;
     private static final int OVERLAY = 6;
     private static final int OVERLAY_BUTTON = 7;
-    private static final int OVERLAY_TEXT = 8;
     private static final int CURSOR = 9;
-    private static final int CURSOR_INNER = 10;
 
     private record Pending(long due, Runnable action) {}
 
+    private final class Part {
+        private final List<TextDisplay> displays = new ArrayList<>();
+
+        private void animate(int ticks, Consumer<TextDisplay> change) {
+            for (TextDisplay display : displays) {
+                display.setInterpolationDelay(0);
+                display.setInterpolationDuration(ticks);
+                change.accept(display);
+            }
+        }
+
+        private void set(Consumer<TextDisplay> change) {
+            displays.forEach(change);
+        }
+
+        private void remove() {
+            parts.remove(this);
+            displays.forEach(display -> kill(plugin, display));
+        }
+    }
+
     private static final class Tile {
-        private final TextDisplay background;
-        private final TextDisplay number;
+        private final Part background;
+        private final Part number;
         private int value;
 
-        private Tile(TextDisplay background, TextDisplay number) {
+        private Tile(Part background, Part number) {
             this.background = background;
             this.number = number;
         }
@@ -70,8 +89,8 @@ final class View {
     private final class Button {
         private final Settings.Area area;
         private final Action action;
-        private final TextDisplay background;
-        private final TextDisplay label;
+        private final Part background;
+        private final Part label;
         private boolean enabled = true;
         private boolean hovered;
 
@@ -83,34 +102,35 @@ final class View {
         }
 
         private void paint() {
-            background.setBackgroundColor(!enabled ? settings.buttonDisabled : hovered ? settings.buttonHover : settings.buttonColor);
+            Color color = !enabled ? settings.buttonDisabled : hovered ? settings.buttonHover : settings.buttonColor;
+            background.set(d -> d.setBackgroundColor(color));
         }
     }
 
     private final Plugin plugin;
     private final Player player;
     private final Settings settings;
-    private final Location origin;
-    private final List<Entity> entities = new ArrayList<>();
+    private final List<Location> faces;
+    private final List<Part> parts = new ArrayList<>();
     private final Map<Integer, Tile> tiles = new HashMap<>();
     private final List<Button> buttons = new ArrayList<>();
     private final List<Button> overlayButtons = new ArrayList<>();
-    private final List<TextDisplay> overlayParts = new ArrayList<>();
+    private final List<Part> overlayParts = new ArrayList<>();
     private final List<Pending> pending = new ArrayList<>();
     private Button undo;
-    private TextDisplay scoreValue;
-    private TextDisplay bestValue;
-    private TextDisplay cursor;
-    private TextDisplay cursorInner;
+    private Part scoreValue;
+    private Part bestValue;
+    private Part cursor;
+    private Part cursorInner;
     private Overlay overlay = Overlay.NONE;
     private boolean overlayUndo;
     private long now;
 
-    View(Plugin plugin, Player player, Settings settings, Location origin) {
+    View(Plugin plugin, Player player, Settings settings, List<Location> faces) {
         this.plugin = plugin;
         this.player = player;
         this.settings = settings;
-        this.origin = origin;
+        this.faces = faces;
     }
 
     void build(Game game) {
@@ -121,6 +141,7 @@ final class View {
         undo = new Button(settings.undo, Action.UNDO, "board.undo", settings.undoTextHeight, PANEL);
         buttons.add(undo);
         buttons.add(new Button(settings.restart, Action.RESTART, "board.restart", settings.restartTextHeight, PANEL));
+        buttons.add(new Button(settings.leave, Action.LEAVE, "board.leave", settings.leaveTextHeight, PANEL));
         rect(settings.board, PANEL, settings.boardColor);
         double cell = settings.cellSize();
         for (int i = 0; i < settings.size * settings.size; i++) {
@@ -129,8 +150,7 @@ final class View {
         double size = settings.cursorSize;
         double inner = size - settings.cursorBorder * 2;
         cursor = rect(new Settings.Area(0, 0, size, size), CURSOR, settings.cursorBorderColor);
-        cursorInner = rect(new Settings.Area(0, 0, inner, inner), CURSOR_INNER, settings.cursorColor);
-        pointer(settings.pageWidth / 2, settings.pageHeight / 2);
+        cursorInner = rect(new Settings.Area(0, 0, inner, inner), CURSOR + 1, settings.cursorColor);
         sync(game, false);
     }
 
@@ -175,18 +195,18 @@ final class View {
     }
 
     void score(int score, int best, int gained) {
-        scoreValue.text(settings.text("board.value", "%value%", score));
-        bestValue.text(settings.text("board.value", "%value%", best));
+        scoreValue.set(d -> d.text(settings.text("board.value", "%value%", score)));
+        bestValue.set(d -> d.text(settings.text("board.value", "%value%", best)));
         if (gained <= 0) return;
         Settings.Area area = settings.score.area();
         double x = area.centerX();
         double y = area.y() + settings.score.valueY();
-        TextDisplay floating = label(x, y, settings.floatTextHeight, FLOAT, settings.text("board.float", "%value%", gained));
-        later(1, () -> animate(floating, settings.floatTicks, d -> {
+        Part floating = label(x, y, settings.floatTextHeight, FLOAT, settings.text("board.float", "%value%", gained));
+        later(1, () -> floating.animate(settings.floatTicks, d -> {
             d.setTransformation(labelTransform(x, y - settings.floatDistance, settings.floatTextHeight, FLOAT, 1));
             d.setTextOpacity(FADED);
         }));
-        later(settings.floatTicks + 1, () -> discard(floating));
+        later(settings.floatTicks + 1, floating::remove);
     }
 
     void undoEnabled(boolean enabled) {
@@ -198,7 +218,7 @@ final class View {
         if (next == overlay && canUndo == overlayUndo) return;
         overlay = next;
         overlayUndo = canUndo;
-        overlayParts.forEach(this::discard);
+        overlayParts.forEach(Part::remove);
         overlayParts.clear();
         overlayButtons.clear();
         if (next == Overlay.NONE) return;
@@ -208,8 +228,8 @@ final class View {
     void pointer(double x, double y) {
         double size = settings.cursorSize;
         double inner = size - settings.cursorBorder * 2;
-        animate(cursor, settings.cursorTicks, d -> d.setTransformation(rectTransform(x, y, size, size, CURSOR, 1)));
-        animate(cursorInner, settings.cursorTicks, d -> d.setTransformation(rectTransform(x, y, inner, inner, CURSOR_INNER, 1)));
+        cursor.animate(settings.cursorTicks, d -> d.setTransformation(rectTransform(x, y, size, size, CURSOR, 1)));
+        cursorInner.animate(settings.cursorTicks, d -> d.setTransformation(rectTransform(x, y, inner, inner, CURSOR + 1, 1)));
         for (Button button : allButtons()) {
             boolean hovered = button.enabled && button.area.contains(x, y);
             if (hovered == button.hovered) continue;
@@ -225,8 +245,7 @@ final class View {
 
     void remove() {
         pending.clear();
-        entities.forEach(entity -> kill(plugin, entity));
-        entities.clear();
+        new ArrayList<>(parts).forEach(Part::remove);
         tiles.clear();
     }
 
@@ -236,19 +255,14 @@ final class View {
         else entity.getScheduler().run(plugin, task -> entity.remove(), null);
     }
 
-    private void discard(Entity entity) {
-        entities.remove(entity);
-        kill(plugin, entity);
-    }
-
     private void showOverlay(Overlay next, boolean canUndo) {
         Settings.Area board = settings.board;
         Color color = next == Overlay.WON ? settings.overlayWon : settings.overlayOver;
-        TextDisplay background = rect(board, OVERLAY, CLEAR);
+        Part background = rect(board, OVERLAY, CLEAR);
         overlayParts.add(background);
-        TextDisplay text = label(board.centerX(), board.y() + settings.overlayTextY, settings.overlayTextHeight, OVERLAY_TEXT,
+        Part text = label(board.centerX(), board.y() + settings.overlayTextY, settings.overlayTextHeight, OVERLAY_BUTTON + 1,
                 settings.text(next == Overlay.WON ? "board.won" : "board.over"));
-        text.setTextOpacity(FADED);
+        text.set(d -> d.setTextOpacity(FADED));
         overlayParts.add(text);
         List<Action> actions = new ArrayList<>();
         if (next == Overlay.WON) actions.add(Action.KEEP_GOING);
@@ -262,6 +276,7 @@ final class View {
                 case KEEP_GOING -> "board.keep-going";
                 case UNDO -> "board.undo";
                 case RESTART -> "board.try-again";
+                case LEAVE -> "board.leave";
             };
             Settings.Area area = new Settings.Area(x, board.y() + settings.overlayButtonY, width, settings.overlayButtonHeight);
             Button button = new Button(area, action, key, settings.overlayButtonTextHeight, OVERLAY_BUTTON);
@@ -271,8 +286,8 @@ final class View {
             x += width + settings.overlayButtonGap;
         }
         later(1, () -> {
-            animate(background, settings.overlayTicks, d -> d.setBackgroundColor(color));
-            animate(text, settings.overlayTicks, d -> d.setTextOpacity(OPAQUE));
+            background.animate(settings.overlayTicks, d -> d.setBackgroundColor(color));
+            text.animate(settings.overlayTicks, d -> d.setTextOpacity(OPAQUE));
         });
     }
 
@@ -282,7 +297,7 @@ final class View {
         return all;
     }
 
-    private TextDisplay scoreBox(Settings.ScoreBox box, String labelKey) {
+    private Part scoreBox(Settings.ScoreBox box, String labelKey) {
         Settings.Area area = box.area();
         rect(area, PANEL, box.color());
         label(area.centerX(), area.y() + box.labelY(), box.labelHeight(), CELL, settings.text(labelKey));
@@ -296,7 +311,7 @@ final class View {
     }
 
     private Tile tile(int value, int cell, float scale) {
-        Tile tile = new Tile(spawn(d -> {}), spawn(d -> {}));
+        Tile tile = new Tile(spawn(d -> d.text(Component.text(BLOCK))), spawn(d -> {}));
         paint(tile, value);
         place(tile, cell, scale, 0);
         return tile;
@@ -305,20 +320,21 @@ final class View {
     private void paint(Tile tile, int value) {
         tile.value = value;
         Settings.TileColors colors = settings.tileColors(value);
-        tile.background.setBackgroundColor(colors.background());
-        tile.number.text(settings.text("board.tile", "%value%", value).colorIfAbsent(TextColor.color(colors.text().asRGB())));
+        Component text = settings.text("board.tile", "%value%", value).colorIfAbsent(TextColor.color(colors.text().asRGB()));
+        tile.background.set(d -> d.setBackgroundColor(colors.background()));
+        tile.number.set(d -> d.text(text));
     }
 
     private void place(Tile tile, int cell, float scale, int ticks) {
         double size = settings.cellSize();
         double height = settings.tileTextHeight(tile.value);
-        animate(tile.background, ticks, d -> d.setTransformation(rectTransform(cellX(cell), cellY(cell), size, size, TILE, scale)));
-        animate(tile.number, ticks, d -> d.setTransformation(labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, scale)));
+        tile.background.animate(ticks, d -> d.setTransformation(rectTransform(cellX(cell), cellY(cell), size, size, TILE, scale)));
+        tile.number.animate(ticks, d -> d.setTransformation(labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, scale)));
     }
 
     private void removeTile(Tile tile) {
-        discard(tile.background);
-        discard(tile.number);
+        tile.background.remove();
+        tile.number.remove();
     }
 
     private void flush() {
@@ -344,7 +360,7 @@ final class View {
         return settings.board.y() + settings.gap + (cell / settings.size) * (size + settings.gap) + size / 2;
     }
 
-    private TextDisplay rect(Settings.Area area, int layer, Color color) {
+    private Part rect(Settings.Area area, int layer, Color color) {
         return spawn(d -> {
             d.text(Component.text(BLOCK));
             d.setBackgroundColor(color);
@@ -352,7 +368,7 @@ final class View {
         });
     }
 
-    private TextDisplay label(double x, double y, double height, int layer, Component text) {
+    private Part label(double x, double y, double height, int layer, Component text) {
         return spawn(d -> {
             d.text(text);
             d.setTransformation(labelTransform(x, y, height, layer, 1));
@@ -384,24 +400,22 @@ final class View {
         return (float) (-settings.distance + layer * settings.layer);
     }
 
-    private void animate(TextDisplay display, int ticks, Consumer<TextDisplay> change) {
-        display.setInterpolationDelay(0);
-        display.setInterpolationDuration(ticks);
-        change.accept(display);
-    }
-
-    private TextDisplay spawn(Consumer<TextDisplay> setup) {
-        TextDisplay display = origin.getWorld().spawn(origin, TextDisplay.class, d -> {
-            d.setPersistent(false);
-            d.setVisibleByDefault(false);
-            d.setBrightness(FULL_BRIGHT);
-            d.setShadowed(false);
-            d.setLineWidth(LINE_WIDTH);
-            d.setBackgroundColor(CLEAR);
-            setup.accept(d);
-        });
-        player.showEntity(plugin, display);
-        entities.add(display);
-        return display;
+    private Part spawn(Consumer<TextDisplay> setup) {
+        Part part = new Part();
+        for (Location face : faces) {
+            TextDisplay display = face.getWorld().spawn(face, TextDisplay.class, d -> {
+                d.setPersistent(false);
+                d.setVisibleByDefault(false);
+                d.setBrightness(FULL_BRIGHT);
+                d.setShadowed(false);
+                d.setLineWidth(LINE_WIDTH);
+                d.setBackgroundColor(CLEAR);
+                setup.accept(d);
+            });
+            player.showEntity(plugin, display);
+            part.displays.add(display);
+        }
+        parts.add(part);
+        return part;
     }
 }

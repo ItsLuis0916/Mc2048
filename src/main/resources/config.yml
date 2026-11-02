@@ -7,16 +7,11 @@ game:
 
 camera:
   distance: 3.2
-  height-above-ground: 24
-  back-gap: 0.2
-  attach-delay-ticks: 2
   box:
     block: BLACK_CONCRETE
-    side: 5
+    radius: 6
     up: 4
-    down: 4
-    front: 7
-    back: 1
+    down: 3
 
 animation:
   slide-ticks: 2
@@ -29,7 +24,7 @@ animation:
   cursor-ticks: 1
 
 layout:
-  unit: 0.004
+  unit: 0.0055
   layer: 0.002
   page:
     width: 560
@@ -61,6 +56,12 @@ layout:
     label-height: 9
     value-y: 41
     value-height: 18
+  leave:
+    x: 180
+    y: 140
+    width: 100
+    height: 40
+    text-height: 13
   undo:
     x: 290
     y: 140
