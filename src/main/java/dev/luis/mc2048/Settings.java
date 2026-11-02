@@ -4,8 +4,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Color;
-import org.bukkit.Material;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
@@ -51,10 +49,9 @@ public final class Settings {
     public final double zoomMax;
     public final double zoomStep;
     public final int zoomTicks;
-    public final BlockData boxBlock;
-    public final int boxRadius;
-    public final int boxUp;
-    public final int boxDown;
+    public final int clearRadius;
+    public final int clearUp;
+    public final int clearDown;
 
     public final int slideTicks;
     public final int popTicks;
@@ -99,9 +96,11 @@ public final class Settings {
     public final double floatTextHeight;
     public final double hintY;
     public final double hintTextHeight;
-    public final Color hintBackground;
-    public final int hintTicks;
-    public final int hintFadeTicks;
+    public final double backdropSize;
+    public final Color backdropColor;
+    public final Area zoomIn;
+    public final Area zoomOut;
+    public final double zoomTextHeight;
     public final double cursorSize;
     public final double cursorBorder;
     public final Color cursorColor;
@@ -128,11 +127,9 @@ public final class Settings {
         zoomMax = config.getDouble("camera.zoom.max");
         zoomStep = config.getDouble("camera.zoom.step");
         zoomTicks = config.getInt("camera.zoom.ticks");
-        Material block = Material.matchMaterial(config.getString("camera.box.block", ""));
-        boxBlock = (block != null && block.isBlock() ? block : Material.BLACK_CONCRETE).createBlockData();
-        boxRadius = config.getInt("camera.box.radius");
-        boxUp = config.getInt("camera.box.up");
-        boxDown = config.getInt("camera.box.down");
+        clearRadius = config.getInt("camera.clear.radius");
+        clearUp = config.getInt("camera.clear.up");
+        clearDown = config.getInt("camera.clear.down");
 
         slideTicks = config.getInt("animation.slide-ticks");
         popTicks = config.getInt("animation.pop-ticks");
@@ -179,9 +176,11 @@ public final class Settings {
         floatTextHeight = layout.getDouble("float.text-height");
         hintY = layout.getDouble("hint.y");
         hintTextHeight = layout.getDouble("hint.text-height");
-        hintBackground = color(layout.getString("hint.background"));
-        hintTicks = config.getInt("animation.hint-ticks");
-        hintFadeTicks = config.getInt("animation.hint-fade-ticks");
+        backdropSize = layout.getDouble("backdrop.size");
+        backdropColor = color(layout.getString("backdrop.color"));
+        zoomIn = area(layout.getConfigurationSection("zoom-in"));
+        zoomOut = area(layout.getConfigurationSection("zoom-out"));
+        zoomTextHeight = layout.getDouble("zoom-in.text-height");
         cursorSize = layout.getDouble("cursor.size");
         cursorBorder = layout.getDouble("cursor.border");
         cursorColor = color(layout.getString("cursor.color"));

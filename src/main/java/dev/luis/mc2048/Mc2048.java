@@ -19,7 +19,6 @@ import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.event.player.PlayerInputEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -142,12 +141,6 @@ public final class Mc2048 extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInteractEntity(PlayerInteractEntityEvent event) {
         block(event);
-    }
-
-    @EventHandler
-    public void onScroll(PlayerItemHeldEvent event) {
-        Session session = session(event.getPlayer());
-        if (session != null) session.scroll(event.getNewSlot() - event.getPreviousSlot());
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

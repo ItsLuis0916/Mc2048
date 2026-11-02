@@ -24,7 +24,7 @@ import java.util.function.Supplier;
 
 final class View {
 
-    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE }
+    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE, ZOOM_IN, ZOOM_OUT }
 
     enum Overlay { NONE, WON, OVER }
 
@@ -43,6 +43,7 @@ final class View {
     private static final Color CLEAR = Color.fromARGB(0);
     private static final Display.Brightness FULL_BRIGHT = new Display.Brightness(15, 15);
 
+    private static final int BACKDROP = -1;
     private static final int PAGE = 0;
     private static final int PANEL = 1;
     private static final int CELL = 2;
@@ -51,8 +52,7 @@ final class View {
     private static final int FLOAT = 5;
     private static final int OVERLAY = 6;
     private static final int OVERLAY_BUTTON = 7;
-    private static final int HINT = 9;
-    private static final int CURSOR = 11;
+    private static final int CURSOR = 9;
 
     private record Pending(long due, Runnable action) {}
 
@@ -148,7 +148,10 @@ final class View {
     }
 
     void build(Game game) {
+        double backdrop = settings.backdropSize;
+        rect(new Settings.Area((settings.pageWidth - backdrop) / 2, (settings.pageHeight - backdrop) / 2, backdrop, backdrop), BACKDROP, settings.backdropColor);
         rect(new Settings.Area(0, 0, settings.pageWidth, settings.pageHeight), PAGE, settings.pageColor);
+        label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, PAGE, settings.text("board.hint"));
         label(settings.title.centerX(), settings.title.centerY(), settings.titleHeight, PANEL, settings.text("board.title"));
         scoreValue = scoreBox(settings.score, "board.score");
         bestValue = scoreBox(settings.best, "board.best");
@@ -156,6 +159,8 @@ final class View {
         buttons.add(undo);
         buttons.add(new Button(settings.restart, Action.RESTART, "board.restart", settings.restartTextHeight, PANEL));
         buttons.add(new Button(settings.leave, Action.LEAVE, "board.leave", settings.leaveTextHeight, PANEL));
+        buttons.add(new Button(settings.zoomOut, Action.ZOOM_OUT, "board.zoom-out", settings.zoomTextHeight, PANEL));
+        buttons.add(new Button(settings.zoomIn, Action.ZOOM_IN, "board.zoom-in", settings.zoomTextHeight, PANEL));
         rect(settings.board, PANEL, settings.boardColor);
         double cell = settings.cellSize();
         for (int i = 0; i < settings.size * settings.size; i++) {
@@ -166,16 +171,6 @@ final class View {
         cursor = rect(new Settings.Area(0, 0, size, size), CURSOR, settings.cursorBorderColor);
         cursorInner = rect(new Settings.Area(0, 0, inner, inner), CURSOR + 1, settings.cursorColor);
         sync(game, false);
-    }
-
-    void hint() {
-        Part hint = label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, HINT, settings.text("board.hint"));
-        hint.set(d -> d.setBackgroundColor(settings.hintBackground));
-        later(settings.hintTicks, () -> hint.animate(settings.hintFadeTicks, d -> {
-            d.setTextOpacity(FADED);
-            d.setBackgroundColor(CLEAR);
-        }));
-        later(settings.hintTicks + settings.hintFadeTicks + 1, hint::remove);
     }
 
     void tick() {
@@ -313,6 +308,8 @@ final class View {
                 case UNDO -> "board.undo";
                 case RESTART -> "board.try-again";
                 case LEAVE -> "board.leave";
+                case ZOOM_IN -> "board.zoom-in";
+                case ZOOM_OUT -> "board.zoom-out";
             };
             Settings.Area area = new Settings.Area(x, board.y() + settings.overlayButtonY, width, settings.overlayButtonHeight);
             Button button = new Button(area, action, key, settings.overlayButtonTextHeight, OVERLAY_BUTTON);

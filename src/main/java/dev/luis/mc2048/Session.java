@@ -24,7 +24,6 @@ import java.util.Map;
 final class Session {
 
     private static final double MIN_POINTER_STEP = 0.5;
-    private static final int HOTBAR_SIZE = 9;
     private static final BlockData AIR = Material.AIR.createBlockData();
 
     private final Mc2048 plugin;
@@ -41,7 +40,6 @@ final class Session {
     private Input input;
     private float yaw;
     private double zoom;
-    private final int heldSlot;
     private double yawAnchor;
     private double pitchAnchor;
     private double pointerX = Double.NaN;
@@ -52,7 +50,6 @@ final class Session {
         this.plugin = plugin;
         this.settings = settings;
         this.zoom = clampZoom(zoom);
-        this.heldSlot = player.getInventory().getHeldItemSlot();
         this.player = player;
         this.game = game;
         this.client = new ClientView(player);
@@ -77,13 +74,12 @@ final class Session {
         lens.setYaw(yaw);
         lens.setPitch(0);
         lens.add(lens.getDirection().multiply(settings.lensOffset));
-        buildBox(world, lens);
+        clearView(world, lens);
         Location back = lens.clone();
         Location front = lens.clone();
         front.setYaw(yaw + 180);
         view = new View(plugin, player, settings, List.of(front, back), zoom);
         view.build(game);
-        view.hint();
         refresh(0, 0);
         camera = world.spawn(lens, ArmorStand.class, stand -> {
             stand.setPersistent(false);
@@ -120,7 +116,6 @@ final class Session {
             View.kill(plugin, seat);
         }
         if (player.isOnline()) {
-            player.getInventory().setHeldItemSlot(heldSlot);
             player.sendMultiBlockChange(realBlocks);
             hidden.forEach(entity -> player.showEntity(plugin, entity));
             if (notify) player.sendMessage(settings.text("stop"));
@@ -136,7 +131,7 @@ final class Session {
         Position position = Position.block(block.getX(), block.getY(), block.getZ());
         if (!realBlocks.containsKey(position)) return;
         player.getScheduler().run(plugin, task -> {
-            if (!closed) player.sendBlockChange(block.getLocation(), settings.boxBlock);
+            if (!closed) player.sendBlockChange(block.getLocation(), AIR);
         }, null);
     }
 
@@ -166,6 +161,14 @@ final class Session {
                 view.sync(game, true);
             }
             case KEEP_GOING -> game.keepPlaying();
+            case ZOOM_IN -> {
+                resize(1);
+                return;
+            }
+            case ZOOM_OUT -> {
+                resize(-1);
+                return;
+            }
             case LEAVE -> {
                 close(true);
                 return;
@@ -188,10 +191,8 @@ final class Session {
         view.overlay(overlay, game.canUndo(), overlayDelay);
     }
 
-    void scroll(int slots) {
-        int half = HOTBAR_SIZE / 2;
-        int steps = slots > half ? slots - HOTBAR_SIZE : slots < -half ? slots + HOTBAR_SIZE : slots;
-        double next = clampZoom(zoom * Math.pow(settings.zoomStep, -steps));
+    private void resize(int direction) {
+        double next = clampZoom(zoom * Math.pow(settings.zoomStep, direction));
         if (next == zoom) return;
         zoom = next;
         view.zoom(zoom);
@@ -227,25 +228,24 @@ final class Session {
         view.pointer(x, y);
     }
 
-    private void buildBox(World world, Location eye) {
+    private void clearView(World world, Location eye) {
         int x = eye.getBlockX();
         int y = eye.getBlockY();
         int z = eye.getBlockZ();
-        int radius = settings.boxRadius;
+        int radius = settings.clearRadius;
         Map<Position, BlockData> fake = new HashMap<>();
         for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -settings.boxDown; dy <= settings.boxUp; dy++) {
+            for (int dy = -settings.clearDown; dy <= settings.clearUp; dy++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     if (y + dy < world.getMinHeight() || y + dy >= world.getMaxHeight()) continue;
-                    boolean shell = Math.abs(dx) == radius || Math.abs(dz) == radius || dy == -settings.boxDown || dy == settings.boxUp;
                     Position position = Position.block(x + dx, y + dy, z + dz);
                     realBlocks.put(position, world.getBlockData(x + dx, y + dy, z + dz));
-                    fake.put(position, shell ? settings.boxBlock : AIR);
+                    fake.put(position, AIR);
                 }
             }
         }
         player.sendMultiBlockChange(fake);
-        BoundingBox inside = new BoundingBox(x - radius, y - settings.boxDown, z - radius, x + radius + 1, y + settings.boxUp + 1, z + radius + 1);
+        BoundingBox inside = new BoundingBox(x - radius, y - settings.clearDown, z - radius, x + radius + 1, y + settings.clearUp + 1, z + radius + 1);
         for (Entity entity : world.getNearbyEntities(inside)) {
             if (entity.equals(player) || entity.equals(seat)) continue;
             player.hideEntity(plugin, entity);

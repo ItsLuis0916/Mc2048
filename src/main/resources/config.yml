@@ -13,11 +13,10 @@ camera:
     default: 1.0
     min: 0.6
     max: 1.5
-    step: 1.06
+    step: 1.1
     ticks: 3
-  box:
-    block: BLACK_CONCRETE
-    radius: 6
+  clear:
+    radius: 8
     up: 5
     down: 5
 
@@ -30,12 +29,13 @@ animation:
   float-distance: 60
   overlay-ticks: 16
   cursor-ticks: 1
-  hint-ticks: 80
-  hint-fade-ticks: 20
 
 layout:
   unit: 0.0055
   layer: 0.002
+  backdrop:
+    size: 12000
+    color: '#000000'
   page:
     width: 560
     height: 730
@@ -66,6 +66,18 @@ layout:
     label-height: 9
     value-y: 41
     value-height: 18
+  zoom-out:
+    x: 30
+    y: 140
+    width: 40
+    height: 40
+    text-height: 13
+  zoom-in:
+    x: 80
+    y: 140
+    width: 40
+    height: 40
+    text-height: 13
   leave:
     x: 180
     y: 140
@@ -110,7 +122,6 @@ layout:
   hint:
     y: 765
     text-height: 14
-    background: '#00000000'
   cursor:
     size: 14
     border: 3

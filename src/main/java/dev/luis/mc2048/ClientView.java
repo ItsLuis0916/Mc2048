@@ -7,6 +7,7 @@ import io.netty.channel.ChannelPromise;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
 import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
+import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
 import net.minecraft.network.protocol.game.ClientboundSetCameraPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
@@ -16,6 +17,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
 import org.bukkit.craftbukkit.entity.CraftEntity;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.entity.Player;
@@ -53,6 +55,7 @@ final class ClientView extends ChannelOutboundHandlerAdapter {
     void attach(org.bukkit.entity.Entity camera, float yaw, float pitch) {
         if (channel.pipeline().get(HANDLER) == null) channel.pipeline().addBefore(PACKET_HANDLER, HANDLER, this);
         player.connection.send(new ClientboundSetCameraPacket(((CraftEntity) camera).getHandle()));
+        player.connection.send(new ClientboundGameEventPacket(ClientboundGameEventPacket.CHANGE_GAME_MODE, GameType.SPECTATOR.getId()));
         player.connection.send(new ClientboundPlayerRotationPacket(yaw, false, pitch, false));
         player.connection.send(flags(true));
         player.inventoryMenu.sendAllDataToRemote();
@@ -62,6 +65,8 @@ final class ClientView extends ChannelOutboundHandlerAdapter {
         if (channel.pipeline().get(HANDLER) == this) channel.pipeline().remove(this);
         if (!channel.isOpen()) return;
         player.connection.send(new ClientboundSetCameraPacket(player));
+        player.connection.send(new ClientboundGameEventPacket(ClientboundGameEventPacket.CHANGE_GAME_MODE, player.gameMode().getId()));
+        player.onUpdateAbilities();
         player.connection.send(flags(false));
         player.inventoryMenu.sendAllDataToRemote();
     }
