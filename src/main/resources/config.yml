@@ -9,11 +9,17 @@ camera:
   distance: 3.2
   attach-delay-ticks: 2
   lens-offset: 0.5
+  zoom:
+    default: 1.0
+    min: 0.6
+    max: 1.5
+    step: 1.06
+    ticks: 3
   box:
     block: BLACK_CONCRETE
     radius: 6
-    up: 4
-    down: 3
+    up: 5
+    down: 5
 
 animation:
   slide-ticks: 2
@@ -24,6 +30,8 @@ animation:
   float-distance: 60
   overlay-ticks: 16
   cursor-ticks: 1
+  hint-ticks: 80
+  hint-fade-ticks: 20
 
 layout:
   unit: 0.0055
@@ -99,6 +107,10 @@ layout:
     button-text-height: 13
   float:
     text-height: 18
+  hint:
+    y: 765
+    text-height: 14
+    background: '#00000000'
   cursor:
     size: 14
     border: 3

@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 final class View {
 
@@ -50,12 +51,21 @@ final class View {
     private static final int FLOAT = 5;
     private static final int OVERLAY = 6;
     private static final int OVERLAY_BUTTON = 7;
-    private static final int CURSOR = 9;
+    private static final int HINT = 9;
+    private static final int CURSOR = 11;
 
     private record Pending(long due, Runnable action) {}
 
     private final class Part {
         private final List<TextDisplay> displays = new ArrayList<>();
+        private Supplier<Transformation> layout;
+
+        private Part layout(Supplier<Transformation> next) {
+            layout = next;
+            Transformation transformation = next.get();
+            displays.forEach(display -> display.setTransformation(transformation));
+            return this;
+        }
 
         private void animate(int ticks, Consumer<TextDisplay> change) {
             for (TextDisplay display : displays) {
@@ -125,8 +135,12 @@ final class View {
     private Overlay overlay = Overlay.NONE;
     private boolean overlayUndo;
     private long now;
+    private double zoom;
+    private double pointerX;
+    private double pointerY;
 
-    View(Plugin plugin, Player player, Settings settings, List<Location> faces) {
+    View(Plugin plugin, Player player, Settings settings, List<Location> faces, double zoom) {
+        this.zoom = zoom;
         this.plugin = plugin;
         this.player = player;
         this.settings = settings;
@@ -152,6 +166,16 @@ final class View {
         cursor = rect(new Settings.Area(0, 0, size, size), CURSOR, settings.cursorBorderColor);
         cursorInner = rect(new Settings.Area(0, 0, inner, inner), CURSOR + 1, settings.cursorColor);
         sync(game, false);
+    }
+
+    void hint() {
+        Part hint = label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, HINT, settings.text("board.hint"));
+        hint.set(d -> d.setBackgroundColor(settings.hintBackground));
+        later(settings.hintTicks, () -> hint.animate(settings.hintFadeTicks, d -> {
+            d.setTextOpacity(FADED);
+            d.setBackgroundColor(CLEAR);
+        }));
+        later(settings.hintTicks + settings.hintFadeTicks + 1, hint::remove);
     }
 
     void tick() {
@@ -225,7 +249,19 @@ final class View {
         later(delay, () -> showOverlay(next, canUndo));
     }
 
+    void zoom(double next) {
+        zoom = next;
+        for (Part part : parts) {
+            if (part.layout == null) continue;
+            Transformation transformation = part.layout.get();
+            part.animate(settings.zoomTicks, d -> d.setTransformation(transformation));
+        }
+        pointer(pointerX, pointerY);
+    }
+
     void pointer(double x, double y) {
+        pointerX = x;
+        pointerY = y;
         double size = settings.cursorSize;
         double inner = size - settings.cursorBorder * 2;
         cursor.animate(settings.cursorTicks, d -> d.setTransformation(rectTransform(x, y, size, size, CURSOR, 1)));
@@ -330,6 +366,8 @@ final class View {
         double height = settings.tileTextHeight(tile.value);
         tile.background.animate(ticks, d -> d.setTransformation(rectTransform(cellX(cell), cellY(cell), size, size, TILE, scale)));
         tile.number.animate(ticks, d -> d.setTransformation(labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, scale)));
+        tile.background.layout = () -> rectTransform(cellX(cell), cellY(cell), size, size, TILE, 1);
+        tile.number.layout = () -> labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, 1);
     }
 
     private void removeTile(Tile tile) {
@@ -364,36 +402,36 @@ final class View {
         return spawn(d -> {
             d.text(Component.text(BLOCK));
             d.setBackgroundColor(color);
-            d.setTransformation(rectTransform(area.centerX(), area.centerY(), area.width(), area.height(), layer, 1));
-        });
+        }).layout(() -> rectTransform(area.centerX(), area.centerY(), area.width(), area.height(), layer, 1));
     }
 
     private Part label(double x, double y, double height, int layer, Component text) {
-        return spawn(d -> {
-            d.text(text);
-            d.setTransformation(labelTransform(x, y, height, layer, 1));
-        });
+        return spawn(d -> d.text(text)).layout(() -> labelTransform(x, y, height, layer, 1));
     }
 
     private Transformation rectTransform(double x, double y, double width, double height, int layer, float scale) {
-        float sx = (float) (width * settings.unit / (BLOCK_WIDTH * PIXEL)) * scale;
-        float sy = (float) (height * settings.unit / (BLOCK_HEIGHT * PIXEL)) * scale;
+        float sx = (float) (width * unit() / (BLOCK_WIDTH * PIXEL)) * scale;
+        float sy = (float) (height * unit() / (BLOCK_HEIGHT * PIXEL)) * scale;
         Vector3f translation = new Vector3f(localX(x) - BLOCK_SHIFT_X * PIXEL * sx, localY(y) - BLOCK_HEIGHT / 2 * PIXEL * sy, localZ(layer));
         return new Transformation(translation, new Quaternionf(), new Vector3f(sx, sy, 1), new Quaternionf());
     }
 
     private Transformation labelTransform(double x, double y, double height, int layer, float scale) {
-        float size = (float) (height * settings.unit / (CAP_HEIGHT * PIXEL)) * scale;
+        float size = (float) (height * unit() / (CAP_HEIGHT * PIXEL)) * scale;
         Vector3f translation = new Vector3f(localX(x) - GLYPH_SHIFT_X * PIXEL * size, localY(y) - GLYPH_CENTER_Y * PIXEL * size, localZ(layer));
         return new Transformation(translation, new Quaternionf(), new Vector3f(size, size, size), new Quaternionf());
     }
 
+    private double unit() {
+        return settings.unit * zoom;
+    }
+
     private float localX(double x) {
-        return (float) ((x - settings.pageWidth / 2) * settings.unit);
+        return (float) ((x - settings.pageWidth / 2) * unit());
     }
 
     private float localY(double y) {
-        return (float) ((settings.pageHeight / 2 - y) * settings.unit);
+        return (float) ((settings.pageHeight / 2 - y) * unit());
     }
 
     private float localZ(int layer) {

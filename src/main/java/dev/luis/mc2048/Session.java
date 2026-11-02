@@ -24,6 +24,7 @@ import java.util.Map;
 final class Session {
 
     private static final double MIN_POINTER_STEP = 0.5;
+    private static final int HOTBAR_SIZE = 9;
     private static final BlockData AIR = Material.AIR.createBlockData();
 
     private final Mc2048 plugin;
@@ -39,15 +40,19 @@ final class Session {
     private ScheduledTask task;
     private Input input;
     private float yaw;
+    private double zoom;
+    private final int heldSlot;
     private double yawAnchor;
     private double pitchAnchor;
     private double pointerX = Double.NaN;
     private double pointerY = Double.NaN;
     private boolean closed;
 
-    Session(Mc2048 plugin, Settings settings, Player player, Game game) {
+    Session(Mc2048 plugin, Settings settings, Player player, Game game, double zoom) {
         this.plugin = plugin;
         this.settings = settings;
+        this.zoom = clampZoom(zoom);
+        this.heldSlot = player.getInventory().getHeldItemSlot();
         this.player = player;
         this.game = game;
         this.client = new ClientView(player);
@@ -76,8 +81,9 @@ final class Session {
         Location back = lens.clone();
         Location front = lens.clone();
         front.setYaw(yaw + 180);
-        view = new View(plugin, player, settings, List.of(front, back));
+        view = new View(plugin, player, settings, List.of(front, back), zoom);
         view.build(game);
+        view.hint();
         refresh(0, 0);
         camera = world.spawn(lens, ArmorStand.class, stand -> {
             stand.setPersistent(false);
@@ -106,7 +112,7 @@ final class Session {
         closed = true;
         if (task != null) task.cancel();
         plugin.ended(player.getUniqueId(), this);
-        plugin.store().save(player.getUniqueId(), game);
+        plugin.store().save(player.getUniqueId(), game, zoom);
         client.detach();
         if (camera != null) View.kill(plugin, camera);
         if (seat != null) {
@@ -114,6 +120,7 @@ final class Session {
             View.kill(plugin, seat);
         }
         if (player.isOnline()) {
+            player.getInventory().setHeldItemSlot(heldSlot);
             player.sendMultiBlockChange(realBlocks);
             hidden.forEach(entity -> player.showEntity(plugin, entity));
             if (notify) player.sendMessage(settings.text("stop"));
@@ -181,11 +188,25 @@ final class Session {
         view.overlay(overlay, game.canUndo(), overlayDelay);
     }
 
+    void scroll(int slots) {
+        int half = HOTBAR_SIZE / 2;
+        int steps = slots > half ? slots - HOTBAR_SIZE : slots < -half ? slots + HOTBAR_SIZE : slots;
+        double next = clampZoom(zoom * Math.pow(settings.zoomStep, -steps));
+        if (next == zoom) return;
+        zoom = next;
+        view.zoom(zoom);
+    }
+
+    private double clampZoom(double value) {
+        return Math.max(settings.zoomMin, Math.min(settings.zoomMax, value));
+    }
+
     private void tick() {
         view.tick();
         Location look = player.getLocation();
-        double halfWidth = settings.pageWidth / 2 * settings.unit;
-        double halfHeight = settings.pageHeight / 2 * settings.unit;
+        double unit = settings.unit * zoom;
+        double halfWidth = settings.pageWidth / 2 * unit;
+        double halfHeight = settings.pageHeight / 2 * unit;
         double sideLimit = Math.toDegrees(Math.atan(halfWidth / settings.distance));
         double upLimit = Math.toDegrees(Math.atan(halfHeight / settings.distance));
         double side = wrap(look.getYaw() - yawAnchor);
@@ -198,8 +219,8 @@ final class Session {
             down = Math.copySign(upLimit, down);
             pitchAnchor = look.getPitch() - down;
         }
-        double x = settings.pageWidth / 2 + settings.distance * Math.tan(Math.toRadians(side)) / settings.unit;
-        double y = settings.pageHeight / 2 + settings.distance * Math.tan(Math.toRadians(down)) / settings.unit;
+        double x = settings.pageWidth / 2 + settings.distance * Math.tan(Math.toRadians(side)) / unit;
+        double y = settings.pageHeight / 2 + settings.distance * Math.tan(Math.toRadians(down)) / unit;
         if (Math.abs(x - pointerX) < MIN_POINTER_STEP && Math.abs(y - pointerY) < MIN_POINTER_STEP) return;
         pointerX = x;
         pointerY = y;

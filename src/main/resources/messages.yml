@@ -12,6 +12,7 @@ board:
   undo: '&#f9f6f2&lUndo'
   restart: '&#f9f6f2&lNew Game'
   leave: '&#f9f6f2&lLeave'
+  hint: '&#f9f6f2Scroll to resize, press &lF5&#f9f6f2 to hide the crosshair'
   won: '&#f9f6f2&lYou win!'
   over: '&#776e65&lGame over!'
   keep-going: '&#f9f6f2&lKeep going'

@@ -19,6 +19,7 @@ import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.event.player.PlayerInputEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -85,11 +86,11 @@ public final class Mc2048 extends JavaPlugin implements Listener {
         UUID uuid = player.getUniqueId();
         if (!opening.add(uuid)) return;
         Game game = new Game(settings.size, settings.winValue, settings.fourChance, settings.undoCooldown, ThreadLocalRandom.current());
-        store.load(uuid, game).whenComplete((found, error) -> player.getScheduler().run(this, task -> {
+        store.load(uuid, game, settings.zoomDefault).whenComplete((saved, error) -> player.getScheduler().run(this, task -> {
             opening.remove(uuid);
             if (!player.isOnline() || sessions.containsKey(uuid)) return;
-            if (!Boolean.TRUE.equals(found)) game.restart(settings.startTiles);
-            Session session = new Session(this, settings, player, game);
+            if (saved == null || !saved.game()) game.restart(settings.startTiles);
+            Session session = new Session(this, settings, player, game, saved == null ? settings.zoomDefault : saved.zoom());
             sessions.put(uuid, session);
             if (!session.open()) sessions.remove(uuid, session);
         }, () -> opening.remove(uuid)));
@@ -141,6 +142,12 @@ public final class Mc2048 extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInteractEntity(PlayerInteractEntityEvent event) {
         block(event);
+    }
+
+    @EventHandler
+    public void onScroll(PlayerItemHeldEvent event) {
+        Session session = session(event.getPlayer());
+        if (session != null) session.scroll(event.getNewSlot() - event.getPreviousSlot());
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

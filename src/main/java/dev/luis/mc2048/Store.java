@@ -23,23 +23,27 @@ public final class Store {
         this.folder = folder;
     }
 
-    public CompletableFuture<Boolean> load(UUID uuid, Game game) {
+    public record Saved(boolean game, double zoom) {}
+
+    public CompletableFuture<Saved> load(UUID uuid, Game game, double defaultZoom) {
         return CompletableFuture.supplyAsync(() -> {
             File file = file(uuid);
-            if (!file.isFile()) return false;
+            if (!file.isFile()) return new Saved(false, defaultZoom);
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+            double zoom = yaml.getDouble("zoom", defaultZoom);
             int[] cells = ints(yaml.getIntegerList("cells"));
-            if (cells.length != game.size() * game.size()) return false;
+            if (cells.length != game.size() * game.size()) return new Saved(false, zoom);
             int[] undo = ints(yaml.getIntegerList("undo.cells"));
             game.load(cells, yaml.getInt("score"), yaml.getInt("best"), yaml.getBoolean("won"),
                     yaml.getBoolean("keep-playing"), undo.length == cells.length ? undo : null,
                     yaml.getInt("undo.score"), yaml.getInt("undo.lock"));
-            return true;
+            return new Saved(true, zoom);
         }, io);
     }
 
-    public void save(UUID uuid, Game game) {
+    public void save(UUID uuid, Game game, double zoom) {
         YamlConfiguration yaml = new YamlConfiguration();
+        yaml.set("zoom", zoom);
         yaml.set("cells", list(game.cells()));
         yaml.set("score", game.score());
         yaml.set("best", game.best());

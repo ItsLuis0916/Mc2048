@@ -46,6 +46,11 @@ public final class Settings {
     public final double distance;
     public final int attachDelay;
     public final double lensOffset;
+    public final double zoomDefault;
+    public final double zoomMin;
+    public final double zoomMax;
+    public final double zoomStep;
+    public final int zoomTicks;
     public final BlockData boxBlock;
     public final int boxRadius;
     public final int boxUp;
@@ -92,6 +97,11 @@ public final class Settings {
     public final double overlayButtonGap;
     public final double overlayButtonTextHeight;
     public final double floatTextHeight;
+    public final double hintY;
+    public final double hintTextHeight;
+    public final Color hintBackground;
+    public final int hintTicks;
+    public final int hintFadeTicks;
     public final double cursorSize;
     public final double cursorBorder;
     public final Color cursorColor;
@@ -113,6 +123,11 @@ public final class Settings {
         distance = config.getDouble("camera.distance");
         attachDelay = Math.max(1, config.getInt("camera.attach-delay-ticks"));
         lensOffset = config.getDouble("camera.lens-offset");
+        zoomDefault = config.getDouble("camera.zoom.default");
+        zoomMin = config.getDouble("camera.zoom.min");
+        zoomMax = config.getDouble("camera.zoom.max");
+        zoomStep = config.getDouble("camera.zoom.step");
+        zoomTicks = config.getInt("camera.zoom.ticks");
         Material block = Material.matchMaterial(config.getString("camera.box.block", ""));
         boxBlock = (block != null && block.isBlock() ? block : Material.BLACK_CONCRETE).createBlockData();
         boxRadius = config.getInt("camera.box.radius");
@@ -162,6 +177,11 @@ public final class Settings {
         overlayButtonGap = layout.getDouble("overlay.button-gap");
         overlayButtonTextHeight = layout.getDouble("overlay.button-text-height");
         floatTextHeight = layout.getDouble("float.text-height");
+        hintY = layout.getDouble("hint.y");
+        hintTextHeight = layout.getDouble("hint.text-height");
+        hintBackground = color(layout.getString("hint.background"));
+        hintTicks = config.getInt("animation.hint-ticks");
+        hintFadeTicks = config.getInt("animation.hint-fade-ticks");
         cursorSize = layout.getDouble("cursor.size");
         cursorBorder = layout.getDouble("cursor.border");
         cursorColor = color(layout.getString("cursor.color"));
