@@ -25,6 +25,8 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -46,7 +48,9 @@ public final class Mc2048 extends JavaPlugin implements Listener {
         saveDefaultConfig();
         File messages = new File(getDataFolder(), MESSAGES);
         if (!messages.exists()) saveResource(MESSAGES, false);
-        settings = new Settings(getConfig(), YamlConfiguration.loadConfiguration(messages));
+        YamlConfiguration loaded = YamlConfiguration.loadConfiguration(messages);
+        loaded.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(getResource(MESSAGES), StandardCharsets.UTF_8)));
+        settings = new Settings(getConfig(), loaded);
         store = new Store(new File(getDataFolder(), PLAYERS));
         getServer().getPluginManager().registerEvents(this, this);
     }
