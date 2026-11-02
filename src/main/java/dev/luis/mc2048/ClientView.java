@@ -8,6 +8,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
 import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
+import net.minecraft.network.protocol.game.ClientboundSetCameraPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetPlayerInventoryPacket;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -49,20 +50,18 @@ final class ClientView extends ChannelOutboundHandlerAdapter {
         vehicle.setPos(vehicle.getX(), 2 * vehicle.getY() - feet, vehicle.getZ());
     }
 
-    void attach(float yaw, float pitch) {
+    void attach(org.bukkit.entity.Entity camera, float yaw, float pitch) {
         if (channel.pipeline().get(HANDLER) == null) channel.pipeline().addBefore(PACKET_HANDLER, HANDLER, this);
-        look(yaw, pitch);
+        player.connection.send(new ClientboundSetCameraPacket(((CraftEntity) camera).getHandle()));
+        player.connection.send(new ClientboundPlayerRotationPacket(yaw, false, pitch, false));
         player.connection.send(flags(true));
         player.inventoryMenu.sendAllDataToRemote();
-    }
-
-    void look(float yaw, float pitch) {
-        player.connection.send(new ClientboundPlayerRotationPacket(yaw, false, pitch, false));
     }
 
     void detach() {
         if (channel.pipeline().get(HANDLER) == this) channel.pipeline().remove(this);
         if (!channel.isOpen()) return;
+        player.connection.send(new ClientboundSetCameraPacket(player));
         player.connection.send(flags(false));
         player.inventoryMenu.sendAllDataToRemote();
     }

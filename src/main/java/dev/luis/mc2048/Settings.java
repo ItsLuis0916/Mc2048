@@ -12,6 +12,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
@@ -43,6 +44,8 @@ public final class Settings {
     public final int undoCooldown;
 
     public final double distance;
+    public final int attachDelay;
+    public final double lensOffset;
     public final BlockData boxBlock;
     public final int boxRadius;
     public final int boxUp;
@@ -108,6 +111,8 @@ public final class Settings {
         undoCooldown = config.getInt("game.undo-cooldown");
 
         distance = config.getDouble("camera.distance");
+        attachDelay = Math.max(1, config.getInt("camera.attach-delay-ticks"));
+        lensOffset = config.getDouble("camera.lens-offset");
         Material block = Material.matchMaterial(config.getString("camera.box.block", ""));
         boxBlock = (block != null && block.isBlock() ? block : Material.BLACK_CONCRETE).createBlockData();
         boxRadius = config.getInt("camera.box.radius");
@@ -189,11 +194,11 @@ public final class Settings {
     }
 
     public Component text(String path) {
-        return LEGACY.deserialize(messages.getString(path, "")).replaceText(KEYBINDS);
+        return LEGACY.deserialize(Objects.requireNonNullElse(messages.getString(path), "")).replaceText(KEYBINDS);
     }
 
     public Component text(String path, String placeholder, Object value) {
-        return LEGACY.deserialize(messages.getString(path, "").replace(placeholder, String.valueOf(value)));
+        return LEGACY.deserialize(Objects.requireNonNullElse(messages.getString(path), "").replace(placeholder, String.valueOf(value)));
     }
 
     private static Area area(ConfigurationSection section) {

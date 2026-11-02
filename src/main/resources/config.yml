@@ -7,6 +7,8 @@ game:
 
 camera:
   distance: 3.2
+  attach-delay-ticks: 2
+  lens-offset: 0.5
   box:
     block: BLACK_CONCRETE
     radius: 6

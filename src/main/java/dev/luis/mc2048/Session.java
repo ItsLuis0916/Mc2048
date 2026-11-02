@@ -5,13 +5,12 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Input;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
-import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
@@ -25,7 +24,6 @@ import java.util.Map;
 final class Session {
 
     private static final double MIN_POINTER_STEP = 0.5;
-    private static final String CAMERA_KEY = "camera";
     private static final BlockData AIR = Material.AIR.createBlockData();
 
     private final Mc2048 plugin;
@@ -33,14 +31,16 @@ final class Session {
     private final Player player;
     private final Game game;
     private final ClientView client;
-    private final NamespacedKey cameraKey;
     private final Map<Position, BlockData> realBlocks = new HashMap<>();
     private final List<Entity> hidden = new ArrayList<>();
     private View view;
     private ItemDisplay seat;
+    private ArmorStand camera;
     private ScheduledTask task;
     private Input input;
     private float yaw;
+    private double yawAnchor;
+    private double pitchAnchor;
     private double pointerX = Double.NaN;
     private double pointerY = Double.NaN;
     private boolean closed;
@@ -51,7 +51,6 @@ final class Session {
         this.player = player;
         this.game = game;
         this.client = new ClientView(player);
-        this.cameraKey = new NamespacedKey(plugin, CAMERA_KEY);
         this.input = player.getCurrentInput();
     }
 
@@ -69,22 +68,34 @@ final class Session {
             return false;
         }
         yaw = feet.getYaw();
-        Location eye = player.getEyeLocation();
-        eye.setPitch(0);
-        buildBox(world, eye);
-        Location front = eye.clone();
+        Location lens = player.getEyeLocation();
+        lens.setYaw(yaw);
+        lens.setPitch(0);
+        lens.add(lens.getDirection().multiply(settings.lensOffset));
+        buildBox(world, lens);
+        Location back = lens.clone();
+        Location front = lens.clone();
         front.setYaw(yaw + 180);
-        Location back = eye.clone();
-        back.setYaw(yaw);
         view = new View(plugin, player, settings, List.of(front, back));
         view.build(game);
         refresh(0, 0);
-        AttributeInstance camera = player.getAttribute(Attribute.CAMERA_DISTANCE);
-        if (camera != null) {
-            camera.removeModifier(cameraKey);
-            camera.addTransientModifier(new AttributeModifier(cameraKey, -1, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
-        }
-        client.attach(yaw, 0);
+        camera = world.spawn(lens, ArmorStand.class, stand -> {
+            stand.setPersistent(false);
+            stand.setVisibleByDefault(false);
+            stand.setMarker(true);
+            stand.setInvisible(true);
+            stand.setGravity(false);
+            stand.setInvulnerable(true);
+            stand.setSilent(true);
+            AttributeInstance distance = stand.getAttribute(Attribute.CAMERA_DISTANCE);
+            if (distance != null) distance.setBaseValue(0);
+        });
+        player.showEntity(plugin, camera);
+        yawAnchor = yaw;
+        pitchAnchor = 0;
+        player.getScheduler().runDelayed(plugin, scheduled -> {
+            if (!closed) client.attach(camera, yaw, 0);
+        }, null, settings.attachDelay);
         task = player.getScheduler().runAtFixedRate(plugin, scheduled -> tick(), () -> close(false), 1, 1);
         player.sendMessage(settings.text("start"));
         return true;
@@ -97,8 +108,7 @@ final class Session {
         plugin.ended(player.getUniqueId(), this);
         plugin.store().save(player.getUniqueId(), game);
         client.detach();
-        AttributeInstance camera = player.getAttribute(Attribute.CAMERA_DISTANCE);
-        if (camera != null) camera.removeModifier(cameraKey);
+        if (camera != null) View.kill(plugin, camera);
         if (seat != null) {
             seat.removePassenger(player);
             View.kill(plugin, seat);
@@ -176,18 +186,20 @@ final class Session {
         Location look = player.getLocation();
         double halfWidth = settings.pageWidth / 2 * settings.unit;
         double halfHeight = settings.pageHeight / 2 * settings.unit;
-        double side = Math.toRadians(wrap(look.getYaw() - yaw));
-        double pitch = Math.toRadians(look.getPitch());
-        double sideLimit = Math.atan(halfWidth / settings.distance);
-        double clampedSide = Math.max(-sideLimit, Math.min(sideLimit, side));
-        double down = Math.tan(pitch) / Math.cos(clampedSide) * settings.distance;
-        double clampedDown = Math.max(-halfHeight, Math.min(halfHeight, down));
-        if (clampedSide != side || clampedDown != down) {
-            float pitchBack = (float) Math.toDegrees(Math.atan(clampedDown * Math.cos(clampedSide) / settings.distance));
-            client.look((float) (yaw + Math.toDegrees(clampedSide)), pitchBack);
+        double sideLimit = Math.toDegrees(Math.atan(halfWidth / settings.distance));
+        double upLimit = Math.toDegrees(Math.atan(halfHeight / settings.distance));
+        double side = wrap(look.getYaw() - yawAnchor);
+        if (Math.abs(side) > sideLimit) {
+            side = Math.copySign(sideLimit, side);
+            yawAnchor = look.getYaw() - side;
         }
-        double x = settings.pageWidth / 2 + settings.distance * Math.tan(clampedSide) / settings.unit;
-        double y = settings.pageHeight / 2 + clampedDown / settings.unit;
+        double down = look.getPitch() - pitchAnchor;
+        if (Math.abs(down) > upLimit) {
+            down = Math.copySign(upLimit, down);
+            pitchAnchor = look.getPitch() - down;
+        }
+        double x = settings.pageWidth / 2 + settings.distance * Math.tan(Math.toRadians(side)) / settings.unit;
+        double y = settings.pageHeight / 2 + settings.distance * Math.tan(Math.toRadians(down)) / settings.unit;
         if (Math.abs(x - pointerX) < MIN_POINTER_STEP && Math.abs(y - pointerY) < MIN_POINTER_STEP) return;
         pointerX = x;
         pointerY = y;
