@@ -1,0 +1,123 @@
+game:
+  size: 4
+  start-tiles: 2
+  win-value: 2048
+  four-chance: 0.1
+  undo-cooldown: 2
+
+camera:
+  distance: 3.2
+  height-above-ground: 24
+  back-gap: 0.2
+  attach-delay-ticks: 2
+  box:
+    block: BLACK_CONCRETE
+    side: 5
+    up: 4
+    down: 4
+    front: 7
+    back: 1
+
+animation:
+  slide-ticks: 2
+  pop-ticks: 2
+  pop-scale: 1.2
+  appear-ticks: 3
+  float-ticks: 12
+  float-distance: 60
+  overlay-ticks: 16
+  cursor-ticks: 1
+
+layout:
+  unit: 0.004
+  layer: 0.002
+  page:
+    width: 560
+    height: 730
+    color: '#faf8ef'
+  title:
+    x: 30
+    y: 30
+    width: 240
+    height: 100
+    text-height: 58
+  score:
+    x: 305
+    y: 40
+    width: 110
+    height: 60
+    color: '#bbada0'
+    label-y: 17
+    label-height: 9
+    value-y: 41
+    value-height: 18
+  best:
+    x: 420
+    y: 40
+    width: 110
+    height: 60
+    color: '#bbada0'
+    label-y: 17
+    label-height: 9
+    value-y: 41
+    value-height: 18
+  undo:
+    x: 290
+    y: 140
+    width: 100
+    height: 40
+    text-height: 13
+  restart:
+    x: 400
+    y: 140
+    width: 130
+    height: 40
+    text-height: 13
+  button:
+    color: '#8f7a66'
+    hover: '#a08a76'
+    disabled: '#d6cdc4'
+  board:
+    x: 30
+    y: 200
+    size: 500
+    gap: 15
+    color: '#bbada0'
+    cell: '#cdc1b4'
+  overlay:
+    won: '#80edc22e'
+    over: '#baeee4da'
+    text-y: 200
+    text-height: 43
+    button-y: 290
+    button-width: 130
+    button-height: 40
+    button-gap: 10
+    button-text-height: 13
+  float:
+    text-height: 18
+  cursor:
+    size: 14
+    border: 3
+    color: '#ffffff'
+    border-color: '#776e65'
+  tiles:
+    text-height:
+      1: 40
+      2: 40
+      3: 32
+      4: 25
+      5: 20
+    colors:
+      2: ['#eee4da', '#776e65']
+      4: ['#ede0c8', '#776e65']
+      8: ['#f2b179', '#f9f6f2']
+      16: ['#f59563', '#f9f6f2']
+      32: ['#f67c5f', '#f9f6f2']
+      64: ['#f65e3b', '#f9f6f2']
+      128: ['#edcf72', '#f9f6f2']
+      256: ['#edcc61', '#f9f6f2']
+      512: ['#edc850', '#f9f6f2']
+      1024: ['#edc53f', '#f9f6f2']
+      2048: ['#edc22e', '#f9f6f2']
+      super: ['#3c3a32', '#f9f6f2']

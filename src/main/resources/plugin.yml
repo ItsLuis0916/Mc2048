@@ -1,0 +1,16 @@
+name: '2048'
+version: '${version}'
+main: dev.luis.mc2048.Mc2048
+api-version: '26.2'
+folia-supported: true
+authors: [ luis ]
+description: 2048 built from display entities, no resource pack needed.
+
+commands:
+  '2048':
+    description: Start or leave a game of 2048.
+    permission: mc2048.play
+
+permissions:
+  mc2048.play:
+    default: true

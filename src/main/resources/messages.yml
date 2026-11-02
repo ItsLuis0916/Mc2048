@@ -1,0 +1,17 @@
+start: '&7Slide with &fW A S D&7, click the buttons, press &fShift &7to leave.'
+stop: '&7Game saved. Type &f/2048 &7to continue.'
+players-only: '&7Only players can play 2048.'
+
+board:
+  title: '&#776e65&l2048'
+  score: '&#eee4da&lSCORE'
+  best: '&#eee4da&lBEST'
+  value: '&#ffffff&l%value%'
+  float: '&#776e65&l+%value%'
+  tile: '&l%value%'
+  undo: '&#f9f6f2&lUndo'
+  restart: '&#f9f6f2&lNew Game'
+  won: '&#f9f6f2&lYou win!'
+  over: '&#776e65&lGame over!'
+  keep-going: '&#f9f6f2&lKeep going'
+  try-again: '&#f9f6f2&lTry again'
