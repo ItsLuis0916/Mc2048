@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 public final class Settings {
@@ -125,13 +126,14 @@ public final class Settings {
 
     public static final class Texts {
         private final FileConfiguration messages;
+        private final Map<String, Component> cache = new ConcurrentHashMap<>();
 
         private Texts(FileConfiguration messages) {
             this.messages = messages;
         }
 
         public Component text(String path) {
-            return LEGACY.deserialize(Objects.requireNonNullElse(messages.getString(path), "")).replaceText(KEYBINDS);
+            return cache.computeIfAbsent(path, key -> LEGACY.deserialize(Objects.requireNonNullElse(messages.getString(key), "")).replaceText(KEYBINDS));
         }
 
         public Component text(String path, String placeholder, Object value) {

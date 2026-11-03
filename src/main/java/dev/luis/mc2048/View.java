@@ -17,6 +17,7 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -131,6 +132,9 @@ final class View {
     private Overlay overlay = Overlay.NONE;
     private boolean overlayUndo;
     private long now;
+    private int shownScore = -1;
+    private int shownBest = -1;
+    private final Map<Integer, Component> tileTexts = new HashMap<>();
     private double zoom;
     private double pointerX;
     private double pointerY;
@@ -172,8 +176,17 @@ final class View {
 
     void tick() {
         now++;
-        List<Pending> due = pending.stream().filter(p -> p.due() <= now).sorted(Comparator.comparingLong(Pending::due)).toList();
-        pending.removeAll(due);
+        if (pending.isEmpty()) return;
+        List<Pending> due = null;
+        for (Iterator<Pending> iterator = pending.iterator(); iterator.hasNext(); ) {
+            Pending next = iterator.next();
+            if (next.due() > now) continue;
+            if (due == null) due = new ArrayList<>();
+            due.add(next);
+            iterator.remove();
+        }
+        if (due == null) return;
+        due.sort(Comparator.comparingLong(Pending::due));
         due.forEach(p -> p.action().run());
     }
 
@@ -211,8 +224,16 @@ final class View {
     }
 
     void score(int score, int best, int gained) {
-        scoreValue.set(d -> d.text(texts.text("board.value", "%value%", score)));
-        bestValue.set(d -> d.text(texts.text("board.value", "%value%", best)));
+        if (score != shownScore) {
+            shownScore = score;
+            Component text = texts.text("board.value", "%value%", score);
+            scoreValue.set(d -> d.text(text));
+        }
+        if (best != shownBest) {
+            shownBest = best;
+            Component text = texts.text("board.value", "%value%", best);
+            bestValue.set(d -> d.text(text));
+        }
         if (gained <= 0) return;
         Settings.Area area = settings.score.area();
         double x = area.centerX();
@@ -260,9 +281,16 @@ final class View {
         pointerY = y;
         double size = settings.cursorSize;
         double inner = size - settings.cursorBorder * 2;
-        cursor.animate(ticks, d -> d.setTransformation(rectTransform(x, y, size, size, CURSOR, 1)));
-        cursorInner.animate(ticks, d -> d.setTransformation(rectTransform(x, y, inner, inner, CURSOR + 1, 1)));
-        for (Button button : allButtons()) {
+        Transformation outer = rectTransform(x, y, size, size, CURSOR, 1);
+        Transformation center = rectTransform(x, y, inner, inner, CURSOR + 1, 1);
+        cursor.animate(ticks, d -> d.setTransformation(outer));
+        cursorInner.animate(ticks, d -> d.setTransformation(center));
+        hover(buttons, x, y);
+        hover(overlayButtons, x, y);
+    }
+
+    private void hover(List<Button> list, double x, double y) {
+        for (Button button : list) {
             boolean hovered = button.enabled && button.area.contains(x, y);
             if (hovered == button.hovered) continue;
             button.hovered = hovered;
@@ -271,7 +299,8 @@ final class View {
     }
 
     Action click() {
-        for (Button button : allButtons()) if (button.hovered) return button.action;
+        for (Button button : buttons) if (button.hovered) return button.action;
+        for (Button button : overlayButtons) if (button.hovered) return button.action;
         return null;
     }
 
@@ -320,12 +349,6 @@ final class View {
             x += width + settings.overlayButtonGap;
         }
         later(1, () -> text.animate(settings.overlayTicks, d -> d.setTextOpacity(OPAQUE)));
-    }
-
-    private List<Button> allButtons() {
-        List<Button> all = new ArrayList<>(buttons);
-        all.addAll(overlayButtons);
-        return all;
     }
 
     private Part scoreBox(Settings.ScoreBox box, String labelKey) {
@@ -399,7 +422,7 @@ final class View {
     }
 
     private Component tileText(int value, Settings.TileColors colors) {
-        return texts.text("board.tile", "%value%", value).colorIfAbsent(TextColor.color(colors.text().asRGB()));
+        return tileTexts.computeIfAbsent(value, key -> texts.text("board.tile", "%value%", key).colorIfAbsent(TextColor.color(colors.text().asRGB())));
     }
 
     private void place(Tile tile, int cell, float scale, int ticks) {

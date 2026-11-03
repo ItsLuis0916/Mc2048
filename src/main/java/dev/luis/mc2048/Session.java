@@ -218,9 +218,8 @@ final class Session {
         zoom = next;
         view.zoom(zoom);
         double unit = settings.unit * zoom;
-        Location look = player.getLocation();
-        yawAnchor = look.getYaw() - Math.toDegrees(Math.atan((pointerX - settings.pageWidth / 2) * unit / settings.distance));
-        pitchAnchor = look.getPitch() - Math.toDegrees(Math.atan((pointerY - settings.pageHeight / 2) * unit / settings.distance));
+        yawAnchor = player.getYaw() - Math.toDegrees(Math.atan((pointerX - settings.pageWidth / 2) * unit / settings.distance));
+        pitchAnchor = player.getPitch() - Math.toDegrees(Math.atan((pointerY - settings.pageHeight / 2) * unit / settings.distance));
     }
 
     private double clampZoom(double value) {
@@ -229,21 +228,22 @@ final class Session {
 
     private void tick() {
         view.tick();
-        Location look = player.getLocation();
+        float lookYaw = player.getYaw();
+        float lookPitch = player.getPitch();
         double unit = settings.unit * zoom;
         double halfWidth = settings.pageWidth / 2 * unit;
         double halfHeight = settings.pageHeight / 2 * unit;
         double sideLimit = Math.toDegrees(Math.atan(halfWidth / settings.distance));
         double upLimit = Math.toDegrees(Math.atan(halfHeight / settings.distance));
-        double side = wrap(look.getYaw() - yawAnchor);
+        double side = wrap(lookYaw - yawAnchor);
         if (Math.abs(side) > sideLimit) {
             side = Math.copySign(sideLimit, side);
-            yawAnchor = look.getYaw() - side;
+            yawAnchor = lookYaw - side;
         }
-        double down = look.getPitch() - pitchAnchor;
+        double down = lookPitch - pitchAnchor;
         if (Math.abs(down) > upLimit) {
             down = Math.copySign(upLimit, down);
-            pitchAnchor = look.getPitch() - down;
+            pitchAnchor = lookPitch - down;
         }
         double x = settings.pageWidth / 2 + settings.distance * Math.tan(Math.toRadians(side)) / unit;
         double y = settings.pageHeight / 2 + settings.distance * Math.tan(Math.toRadians(down)) / unit;
@@ -263,8 +263,10 @@ final class Session {
             for (int dy = -settings.clearDown; dy <= settings.clearUp; dy++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     if (y + dy < world.getMinHeight() || y + dy >= world.getMaxHeight()) continue;
+                    BlockData real = world.getBlockData(x + dx, y + dy, z + dz);
+                    if (real.getMaterial().isAir()) continue;
                     Position position = Position.block(x + dx, y + dy, z + dz);
-                    realBlocks.put(position, world.getBlockData(x + dx, y + dy, z + dz));
+                    realBlocks.put(position, real);
                     fake.put(position, AIR);
                 }
             }
