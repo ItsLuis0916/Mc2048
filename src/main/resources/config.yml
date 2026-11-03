@@ -26,7 +26,6 @@ animation:
   appear-ticks: 3
   float-ticks: 12
   float-distance: 60
-  overlay-ticks: 16
   cursor-ticks: 1
 
 layout:

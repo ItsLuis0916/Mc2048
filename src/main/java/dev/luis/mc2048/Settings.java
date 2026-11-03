@@ -63,7 +63,6 @@ public final class Settings {
     public final int appearTicks;
     public final int floatTicks;
     public final double floatDistance;
-    public final int overlayTicks;
     public final int cursorTicks;
 
     public final double unit;
@@ -167,7 +166,6 @@ public final class Settings {
         appearTicks = config.getInt("animation.appear-ticks");
         floatTicks = config.getInt("animation.float-ticks");
         floatDistance = config.getDouble("animation.float-distance");
-        overlayTicks = config.getInt("animation.overlay-ticks");
         cursorTicks = config.getInt("animation.cursor-ticks");
 
         ConfigurationSection layout = config.getConfigurationSection("layout");

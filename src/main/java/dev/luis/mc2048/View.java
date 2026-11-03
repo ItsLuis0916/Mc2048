@@ -38,7 +38,6 @@ final class View {
     private static final float GLYPH_CENTER_Y = 5.5f;
     private static final float CAP_HEIGHT = 7;
     private static final float HIDDEN = 0.001f;
-    private static final byte OPAQUE = (byte) -1;
     private static final byte FADED = 4;
     private static final int LINE_WIDTH = 1000;
     private static final Color CLEAR = Color.fromARGB(0);
@@ -251,7 +250,7 @@ final class View {
         undo.paint();
     }
 
-    void overlay(Overlay next, boolean canUndo, int delay) {
+    void overlay(Overlay next, boolean canUndo) {
         if (next == overlay && canUndo == overlayUndo) return;
         overlay = next;
         overlayUndo = canUndo;
@@ -259,7 +258,7 @@ final class View {
         overlayParts.clear();
         overlayButtons.clear();
         if (next == Overlay.NONE) return;
-        later(delay, () -> showOverlay(next, canUndo));
+        showOverlay(next, canUndo);
     }
 
     void zoom(double next) {
@@ -323,7 +322,6 @@ final class View {
         overlayParts.add(background);
         Part text = label(board.centerX(), board.y() + settings.overlayTextY, settings.overlayTextHeight, OVERLAY_BUTTON + 1,
                 texts.text(next == Overlay.WON ? "board.won" : "board.over"));
-        text.set(d -> d.setTextOpacity(FADED));
         overlayParts.add(text);
         List<Action> actions = new ArrayList<>();
         if (next == Overlay.WON) actions.add(Action.KEEP_GOING);
@@ -348,7 +346,6 @@ final class View {
             overlayParts.add(button.label);
             x += width + settings.overlayButtonGap;
         }
-        later(1, () -> text.animate(settings.overlayTicks, d -> d.setTextOpacity(OPAQUE)));
     }
 
     private Part scoreBox(Settings.ScoreBox box, String labelKey) {

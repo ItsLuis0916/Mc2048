@@ -76,7 +76,7 @@ final class Session {
         front.setYaw(yaw + 180);
         view = new View(plugin, player, settings, texts, List.of(front, back), zoom);
         view.build(game);
-        refresh(0, 0);
+        refresh(0);
         ear = lens.clone();
         camera = world.spawn(lens, ArmorStand.class, stand -> {
             stand.setPersistent(false);
@@ -179,7 +179,7 @@ final class Session {
                 return;
             }
         }
-        refresh(0, 0);
+        refresh(0);
     }
 
     private void move(Game.Direction direction) {
@@ -192,15 +192,15 @@ final class Session {
         if (merged == 0) play("slide", 0);
         else play("merge", (float) Math.min(settings.mergePitchMax, settings.mergePitchStep * (Integer.numberOfTrailingZeros(merged) - 2)));
         view.render(turn);
-        refresh(turn.gained(), settings.slideTicks + settings.appearTicks);
+        refresh(turn.gained());
     }
 
-    private void refresh(int gained, int overlayDelay) {
+    private void refresh(int gained) {
         plugin.store().remember(player.getUniqueId(), game);
         view.score(game.score(), game.best(), gained);
         view.undoEnabled(game.canUndo());
         View.Overlay overlay = game.showWin() ? View.Overlay.WON : game.over() ? View.Overlay.OVER : View.Overlay.NONE;
-        view.overlay(overlay, game.canUndo(), overlayDelay);
+        view.overlay(overlay, game.canUndo());
         if (overlay != shownOverlay && overlay != View.Overlay.NONE) play(overlay == View.Overlay.WON ? "won" : "over", 0);
         shownOverlay = overlay;
     }
