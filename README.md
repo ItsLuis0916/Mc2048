@@ -14,6 +14,7 @@ Type `/2048` and the screen goes black, the board appears in front of you and yo
 - Game and best score are saved per player, `/2048` continues where you left off
 - Board size per player with the + and - buttons, so it fits any FOV
 - No crosshair, hotbar or hearts while playing, only the board on black
+- Short note block sounds for moves, merges, buttons, win and game over, all set in `config.yml`
 - Every colour, size, timing and text is in `config.yml` and `messages.yml`
 
 ## Requirements

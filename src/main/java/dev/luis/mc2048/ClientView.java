@@ -52,6 +52,13 @@ final class ClientView extends ChannelOutboundHandlerAdapter {
         vehicle.setPos(vehicle.getX(), 2 * vehicle.getY() - feet, vehicle.getZ());
     }
 
+    static void face(org.bukkit.entity.Entity entity, float yaw) {
+        Entity handle = ((CraftEntity) entity).getHandle();
+        handle.setYRot(yaw);
+        handle.setYHeadRot(yaw);
+        handle.setYBodyRot(yaw);
+    }
+
     void attach(org.bukkit.entity.Entity camera, float yaw, float pitch) {
         if (channel.pipeline().get(HANDLER) == null) channel.pipeline().addBefore(PACKET_HANDLER, HANDLER, this);
         player.connection.send(new ClientboundSetCameraPacket(((CraftEntity) camera).getHandle()));

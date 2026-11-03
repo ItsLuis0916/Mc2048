@@ -1,5 +1,7 @@
 package dev.luis.mc2048;
 
+import net.kyori.adventure.key.Key;
+import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -7,6 +9,7 @@ import org.bukkit.Color;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -109,6 +112,9 @@ public final class Settings {
     private final TreeMap<Integer, Double> tileTextHeights = new TreeMap<>();
     private final Map<Integer, TileColors> tileColors = new HashMap<>();
     private final TileColors superTile;
+    private final Map<String, List<Sound>> sounds = new HashMap<>();
+    public final float mergePitchStep;
+    public final float mergePitchMax;
     private final FileConfiguration messages;
 
     public Settings(FileConfiguration config, FileConfiguration messages) {
@@ -197,6 +203,21 @@ public final class Settings {
             else tileColors.put(Integer.parseInt(value), tile);
         }
         superTile = fallback;
+
+        ConfigurationSection soundSection = config.getConfigurationSection("sounds.events");
+        for (String event : soundSection.getKeys(false)) {
+            List<Sound> list = new ArrayList<>();
+            for (Map<?, ?> entry : soundSection.getMapList(event)) {
+                Object name = entry.get("sound");
+                if (name == null) continue;
+                float volume = entry.get("volume") instanceof Number number ? number.floatValue() : 1;
+                float pitch = entry.get("pitch") instanceof Number number ? number.floatValue() : 1;
+                list.add(Sound.sound(Key.key(name.toString()), Sound.Source.MASTER, volume, pitch));
+            }
+            sounds.put(event, list);
+        }
+        mergePitchStep = (float) config.getDouble("sounds.merge-pitch-step");
+        mergePitchMax = (float) config.getDouble("sounds.merge-pitch-max");
     }
 
     public double cellSize() {
@@ -206,6 +227,10 @@ public final class Settings {
     public double tileTextHeight(int value) {
         Map.Entry<Integer, Double> entry = tileTextHeights.floorEntry(String.valueOf(value).length());
         return entry == null ? tileTextHeights.firstEntry().getValue() : entry.getValue();
+    }
+
+    public List<Sound> sounds(String event) {
+        return sounds.getOrDefault(event, List.of());
     }
 
     public TileColors tileColors(int value) {

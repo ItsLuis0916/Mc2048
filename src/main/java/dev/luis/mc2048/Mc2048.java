@@ -46,6 +46,7 @@ public final class Mc2048 extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        getConfig().options().copyDefaults(true);
         File messages = new File(getDataFolder(), MESSAGES);
         if (!messages.exists()) saveResource(MESSAGES, false);
         YamlConfiguration loaded = YamlConfiguration.loadConfiguration(messages);

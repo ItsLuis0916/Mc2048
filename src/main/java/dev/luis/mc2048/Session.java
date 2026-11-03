@@ -2,6 +2,7 @@ package dev.luis.mc2048;
 
 import io.papermc.paper.math.Position;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import net.kyori.adventure.sound.Sound;
 import org.bukkit.Input;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -24,6 +25,7 @@ import java.util.Map;
 final class Session {
 
     private static final double MIN_POINTER_STEP = 0.5;
+    private static final float YAW_STEP = 360f / 256;
     private static final BlockData AIR = Material.AIR.createBlockData();
 
     private final Mc2048 plugin;
@@ -36,6 +38,7 @@ final class Session {
     private View view;
     private ItemDisplay seat;
     private ArmorStand camera;
+    private Location ear;
     private ScheduledTask task;
     private Input input;
     private float yaw;
@@ -45,6 +48,7 @@ final class Session {
     private double pointerX = Double.NaN;
     private double pointerY = Double.NaN;
     private boolean closed;
+    private View.Overlay shownOverlay = View.Overlay.NONE;
 
     Session(Mc2048 plugin, Settings settings, Player player, Game game, double zoom) {
         this.plugin = plugin;
@@ -69,7 +73,7 @@ final class Session {
             View.kill(plugin, seat);
             return false;
         }
-        yaw = feet.getYaw();
+        yaw = Math.round(feet.getYaw() / YAW_STEP) * YAW_STEP;
         Location lens = player.getEyeLocation();
         lens.setYaw(yaw);
         lens.setPitch(0);
@@ -81,6 +85,7 @@ final class Session {
         view = new View(plugin, player, settings, List.of(front, back), zoom);
         view.build(game);
         refresh(0, 0);
+        ear = lens.clone();
         camera = world.spawn(lens, ArmorStand.class, stand -> {
             stand.setPersistent(false);
             stand.setVisibleByDefault(false);
@@ -89,6 +94,7 @@ final class Session {
             stand.setGravity(false);
             stand.setInvulnerable(true);
             stand.setSilent(true);
+            ClientView.face(stand, yaw);
             AttributeInstance distance = stand.getAttribute(Attribute.CAMERA_DISTANCE);
             if (distance != null) distance.setBaseValue(0);
         });
@@ -100,6 +106,7 @@ final class Session {
         }, null, settings.attachDelay);
         task = player.getScheduler().runAtFixedRate(plugin, scheduled -> tick(), () -> close(false), 1, 1);
         player.sendMessage(settings.text("start"));
+        play("open", 0);
         return true;
     }
 
@@ -119,12 +126,9 @@ final class Session {
             player.sendMultiBlockChange(realBlocks);
             hidden.forEach(entity -> player.showEntity(plugin, entity));
             if (notify) player.sendMessage(settings.text("stop"));
+            play("close", 0);
         }
         if (view != null) view.remove();
-    }
-
-    boolean owns(Entity entity) {
-        return entity.equals(seat);
     }
 
     void refake(Block block) {
@@ -151,6 +155,7 @@ final class Session {
     void click() {
         View.Action action = view.click();
         if (action == null) return;
+        play(action == View.Action.UNDO ? "undo" : action == View.Action.RESTART ? "restart" : "click", 0);
         switch (action) {
             case UNDO -> {
                 if (!game.undo()) return;
@@ -179,7 +184,13 @@ final class Session {
 
     private void move(Game.Direction direction) {
         Game.Turn turn = game.move(direction);
-        if (turn == null) return;
+        if (turn == null) {
+            play("blocked", 0);
+            return;
+        }
+        int merged = turn.merges().stream().mapToInt(Game.Merge::value).max().orElse(0);
+        if (merged == 0) play("slide", 0);
+        else play("merge", (float) Math.min(settings.mergePitchMax, settings.mergePitchStep * (Integer.numberOfTrailingZeros(merged) - 2)));
         view.render(turn);
         refresh(turn.gained(), settings.slideTicks + settings.appearTicks);
     }
@@ -189,6 +200,15 @@ final class Session {
         view.undoEnabled(game.canUndo());
         View.Overlay overlay = game.showWin() ? View.Overlay.WON : game.over() ? View.Overlay.OVER : View.Overlay.NONE;
         view.overlay(overlay, game.canUndo(), overlayDelay);
+        if (overlay != shownOverlay && overlay != View.Overlay.NONE) play(overlay == View.Overlay.WON ? "won" : "over", 0);
+        shownOverlay = overlay;
+    }
+
+    private void play(String event, float pitchShift) {
+        if (ear == null) return;
+        for (Sound sound : settings.sounds(event)) {
+            player.playSound(Sound.sound(sound).pitch(sound.pitch() + pitchShift).build(), ear.getX(), ear.getY(), ear.getZ());
+        }
     }
 
     private void resize(int direction) {
@@ -196,6 +216,10 @@ final class Session {
         if (next == zoom) return;
         zoom = next;
         view.zoom(zoom);
+        double unit = settings.unit * zoom;
+        Location look = player.getLocation();
+        yawAnchor = look.getYaw() - Math.toDegrees(Math.atan((pointerX - settings.pageWidth / 2) * unit / settings.distance));
+        pitchAnchor = look.getPitch() - Math.toDegrees(Math.atan((pointerY - settings.pageHeight / 2) * unit / settings.distance));
     }
 
     private double clampZoom(double value) {

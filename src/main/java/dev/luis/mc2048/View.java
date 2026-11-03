@@ -60,13 +60,6 @@ final class View {
         private final List<TextDisplay> displays = new ArrayList<>();
         private Supplier<Transformation> layout;
 
-        private Part layout(Supplier<Transformation> next) {
-            layout = next;
-            Transformation transformation = next.get();
-            displays.forEach(display -> display.setTransformation(transformation));
-            return this;
-        }
-
         private void animate(int ticks, Consumer<TextDisplay> change) {
             for (TextDisplay display : displays) {
                 display.setInterpolationDelay(0);
@@ -251,16 +244,20 @@ final class View {
             Transformation transformation = part.layout.get();
             part.animate(settings.zoomTicks, d -> d.setTransformation(transformation));
         }
-        pointer(pointerX, pointerY);
+        movePointer(pointerX, pointerY, settings.zoomTicks);
     }
 
     void pointer(double x, double y) {
+        movePointer(x, y, settings.cursorTicks);
+    }
+
+    private void movePointer(double x, double y, int ticks) {
         pointerX = x;
         pointerY = y;
         double size = settings.cursorSize;
         double inner = size - settings.cursorBorder * 2;
-        cursor.animate(settings.cursorTicks, d -> d.setTransformation(rectTransform(x, y, size, size, CURSOR, 1)));
-        cursorInner.animate(settings.cursorTicks, d -> d.setTransformation(rectTransform(x, y, inner, inner, CURSOR + 1, 1)));
+        cursor.animate(ticks, d -> d.setTransformation(rectTransform(x, y, size, size, CURSOR, 1)));
+        cursorInner.animate(ticks, d -> d.setTransformation(rectTransform(x, y, inner, inner, CURSOR + 1, 1)));
         for (Button button : allButtons()) {
             boolean hovered = button.enabled && button.area.contains(x, y);
             if (hovered == button.hovered) continue;
@@ -344,18 +341,33 @@ final class View {
     }
 
     private Tile tile(int value, int cell, float scale) {
-        Tile tile = new Tile(spawn(d -> d.text(Component.text(BLOCK))), spawn(d -> {}));
-        paint(tile, value);
-        place(tile, cell, scale, 0);
+        Settings.TileColors colors = settings.tileColors(value);
+        double size = settings.cellSize();
+        double height = settings.tileTextHeight(value);
+        Part background = spawn(d -> {
+            d.text(Component.text(BLOCK));
+            d.setBackgroundColor(colors.background());
+            d.setTransformation(rectTransform(cellX(cell), cellY(cell), size, size, TILE, scale));
+        }, () -> rectTransform(cellX(cell), cellY(cell), size, size, TILE, 1));
+        Part number = spawn(d -> {
+            d.text(tileText(value, colors));
+            d.setTransformation(labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, scale));
+        }, () -> labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, 1));
+        Tile tile = new Tile(background, number);
+        tile.value = value;
         return tile;
     }
 
     private void paint(Tile tile, int value) {
         tile.value = value;
         Settings.TileColors colors = settings.tileColors(value);
-        Component text = settings.text("board.tile", "%value%", value).colorIfAbsent(TextColor.color(colors.text().asRGB()));
+        Component text = tileText(value, colors);
         tile.background.set(d -> d.setBackgroundColor(colors.background()));
         tile.number.set(d -> d.text(text));
+    }
+
+    private Component tileText(int value, Settings.TileColors colors) {
+        return settings.text("board.tile", "%value%", value).colorIfAbsent(TextColor.color(colors.text().asRGB()));
     }
 
     private void place(Tile tile, int cell, float scale, int ticks) {
@@ -399,11 +411,11 @@ final class View {
         return spawn(d -> {
             d.text(Component.text(BLOCK));
             d.setBackgroundColor(color);
-        }).layout(() -> rectTransform(area.centerX(), area.centerY(), area.width(), area.height(), layer, 1));
+        }, () -> rectTransform(area.centerX(), area.centerY(), area.width(), area.height(), layer, 1));
     }
 
     private Part label(double x, double y, double height, int layer, Component text) {
-        return spawn(d -> d.text(text)).layout(() -> labelTransform(x, y, height, layer, 1));
+        return spawn(d -> d.text(text), () -> labelTransform(x, y, height, layer, 1));
     }
 
     private Transformation rectTransform(double x, double y, double width, double height, int layer, float scale) {
@@ -435,8 +447,10 @@ final class View {
         return (float) (-settings.distance + layer * settings.layer);
     }
 
-    private Part spawn(Consumer<TextDisplay> setup) {
+    private Part spawn(Consumer<TextDisplay> setup, Supplier<Transformation> layout) {
         Part part = new Part();
+        part.layout = layout;
+        Transformation start = layout.get();
         for (Location face : faces) {
             TextDisplay display = face.getWorld().spawn(face, TextDisplay.class, d -> {
                 d.setPersistent(false);
@@ -445,6 +459,7 @@ final class View {
                 d.setShadowed(false);
                 d.setLineWidth(LINE_WIDTH);
                 d.setBackgroundColor(CLEAR);
+                d.setTransformation(start);
                 setup.accept(d);
             });
             player.showEntity(plugin, display);

@@ -10,15 +10,15 @@ camera:
   attach-delay-ticks: 2
   lens-offset: 0.5
   zoom:
-    default: 1.0
+    default: 1.5
     min: 0.6
-    max: 1.5
+    max: 2.5
     step: 1.1
     ticks: 3
   clear:
     radius: 8
-    up: 5
-    down: 5
+    up: 7
+    down: 7
 
 animation:
   slide-ticks: 2
@@ -120,8 +120,8 @@ layout:
   float:
     text-height: 18
   hint:
-    y: 765
-    text-height: 14
+    y: 755
+    text-height: 12
   cursor:
     size: 14
     border: 3
@@ -147,3 +147,32 @@ layout:
       1024: ['#edc53f', '#f9f6f2']
       2048: ['#edc22e', '#f9f6f2']
       super: ['#3c3a32', '#f9f6f2']
+
+sounds:
+  merge-pitch-step: 0.1
+  merge-pitch-max: 1.0
+  events:
+    open:
+      - {sound: 'minecraft:block.note_block.chime', volume: 0.45, pitch: 1.2}
+      - {sound: 'minecraft:block.note_block.pling', volume: 0.25, pitch: 1.8}
+    close:
+      - {sound: 'minecraft:block.note_block.chime', volume: 0.35, pitch: 0.9}
+    slide:
+      - {sound: 'minecraft:block.note_block.hat', volume: 0.2, pitch: 1.7}
+    merge:
+      - {sound: 'minecraft:block.note_block.pling', volume: 0.35, pitch: 0.8}
+      - {sound: 'minecraft:block.note_block.hat', volume: 0.15, pitch: 1.7}
+    blocked:
+      - {sound: 'minecraft:block.note_block.bass', volume: 0.25, pitch: 0.8}
+    click:
+      - {sound: 'minecraft:ui.button.click', volume: 0.2, pitch: 1.6}
+    undo:
+      - {sound: 'minecraft:item.book.page_turn', volume: 0.8, pitch: 1.1}
+    restart:
+      - {sound: 'minecraft:ui.button.click', volume: 0.2, pitch: 1.6}
+      - {sound: 'minecraft:block.note_block.chime', volume: 0.3, pitch: 1.5}
+    won:
+      - {sound: 'minecraft:ui.toast.challenge_complete', volume: 0.45, pitch: 1.0}
+    over:
+      - {sound: 'minecraft:block.note_block.bass', volume: 0.45, pitch: 0.6}
+      - {sound: 'minecraft:block.note_block.didgeridoo', volume: 0.25, pitch: 0.6}
