@@ -15,6 +15,7 @@ Type `/2048` and the screen goes black, the board appears in front of you and yo
 - Board size per player with the + and - buttons, so it fits any FOV
 - No crosshair, hotbar or hearts while playing, only the board on black
 - Short note block sounds for moves, merges, buttons, win and game over, all set in `config.yml`
+- English and German built in, the language follows the player's client. Drop a `messages_<language>.yml` into the plugin folder to add more
 - Every colour, size, timing and text is in `config.yml` and `messages.yml`
 
 ## Requirements

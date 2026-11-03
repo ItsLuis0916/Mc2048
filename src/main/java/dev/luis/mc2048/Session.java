@@ -33,6 +33,7 @@ final class Session {
     private final Player player;
     private final Game game;
     private final ClientView client;
+    private final Settings.Texts texts;
     private final Map<Position, BlockData> realBlocks = new HashMap<>();
     private final List<Entity> hidden = new ArrayList<>();
     private View view;
@@ -57,6 +58,7 @@ final class Session {
         this.player = player;
         this.game = game;
         this.client = new ClientView(player);
+        this.texts = settings.texts(player.locale());
         this.input = player.getCurrentInput();
     }
 
@@ -72,7 +74,7 @@ final class Session {
         Location back = lens.clone();
         Location front = lens.clone();
         front.setYaw(yaw + 180);
-        view = new View(plugin, player, settings, List.of(front, back), zoom);
+        view = new View(plugin, player, settings, texts, List.of(front, back), zoom);
         view.build(game);
         refresh(0, 0);
         ear = lens.clone();
@@ -103,7 +105,7 @@ final class Session {
             return false;
         }
         task = player.getScheduler().runAtFixedRate(plugin, scheduled -> tick(), () -> close(false), 1, 1);
-        player.sendMessage(settings.text("start"));
+        player.sendMessage(texts.text("start"));
         play("open", 0);
         return true;
     }
@@ -123,7 +125,7 @@ final class Session {
         if (player.isOnline()) {
             player.sendMultiBlockChange(realBlocks);
             hidden.forEach(entity -> player.showEntity(plugin, entity));
-            if (notify) player.sendMessage(settings.text("stop"));
+            if (notify) player.sendMessage(texts.text("stop"));
             play("close", 0);
         }
         if (view != null) view.remove();

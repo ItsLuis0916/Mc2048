@@ -103,7 +103,7 @@ final class View {
             this.area = area;
             this.action = action;
             this.background = rect(area, layer, settings.buttonColor);
-            this.label = label(area.centerX(), area.centerY(), textHeight, layer + 1, settings.text(text));
+            this.label = label(area.centerX(), area.centerY(), textHeight, layer + 1, texts.text(text));
         }
 
         private void paint() {
@@ -115,6 +115,7 @@ final class View {
     private final Plugin plugin;
     private final Player player;
     private final Settings settings;
+    private final Settings.Texts texts;
     private final List<Location> faces;
     private final List<Part> parts = new ArrayList<>();
     private final Map<Integer, Tile> tiles = new HashMap<>();
@@ -134,7 +135,8 @@ final class View {
     private double pointerX;
     private double pointerY;
 
-    View(Plugin plugin, Player player, Settings settings, List<Location> faces, double zoom) {
+    View(Plugin plugin, Player player, Settings settings, Settings.Texts texts, List<Location> faces, double zoom) {
+        this.texts = texts;
         this.zoom = zoom;
         this.plugin = plugin;
         this.player = player;
@@ -146,8 +148,8 @@ final class View {
         double backdrop = settings.backdropSize;
         rect(new Settings.Area((settings.pageWidth - backdrop) / 2, (settings.pageHeight - backdrop) / 2, backdrop, backdrop), BACKDROP, settings.backdropColor);
         rect(new Settings.Area(0, 0, settings.pageWidth, settings.pageHeight), PAGE, settings.pageColor);
-        label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, PAGE, settings.text("board.hint"));
-        label(settings.title.centerX(), settings.title.centerY(), settings.titleHeight, PANEL, settings.text("board.title"));
+        label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, PAGE, texts.text("board.hint"));
+        label(settings.title.centerX(), settings.title.centerY(), settings.titleHeight, PANEL, texts.text("board.title"));
         scoreValue = scoreBox(settings.score, "board.score");
         bestValue = scoreBox(settings.best, "board.best");
         undo = new Button(settings.undo, Action.UNDO, "board.undo", settings.undoTextHeight, PANEL);
@@ -209,13 +211,13 @@ final class View {
     }
 
     void score(int score, int best, int gained) {
-        scoreValue.set(d -> d.text(settings.text("board.value", "%value%", score)));
-        bestValue.set(d -> d.text(settings.text("board.value", "%value%", best)));
+        scoreValue.set(d -> d.text(texts.text("board.value", "%value%", score)));
+        bestValue.set(d -> d.text(texts.text("board.value", "%value%", best)));
         if (gained <= 0) return;
         Settings.Area area = settings.score.area();
         double x = area.centerX();
         double y = area.y() + settings.score.valueY();
-        Part floating = label(x, y, settings.floatTextHeight, FLOAT, settings.text("board.float", "%value%", gained));
+        Part floating = label(x, y, settings.floatTextHeight, FLOAT, texts.text("board.float", "%value%", gained));
         later(1, () -> floating.animate(settings.floatTicks, d -> {
             d.setTransformation(labelTransform(x, y - settings.floatDistance, settings.floatTextHeight, FLOAT, 1));
             d.setTextOpacity(FADED);
@@ -291,7 +293,7 @@ final class View {
         Part background = rect(board, OVERLAY, color);
         overlayParts.add(background);
         Part text = label(board.centerX(), board.y() + settings.overlayTextY, settings.overlayTextHeight, OVERLAY_BUTTON + 1,
-                settings.text(next == Overlay.WON ? "board.won" : "board.over"));
+                texts.text(next == Overlay.WON ? "board.won" : "board.over"));
         text.set(d -> d.setTextOpacity(FADED));
         overlayParts.add(text);
         List<Action> actions = new ArrayList<>();
@@ -329,7 +331,7 @@ final class View {
     private Part scoreBox(Settings.ScoreBox box, String labelKey) {
         Settings.Area area = box.area();
         rect(area, PANEL, box.color());
-        label(area.centerX(), area.y() + box.labelY(), box.labelHeight(), CELL, settings.text(labelKey));
+        label(area.centerX(), area.y() + box.labelY(), box.labelHeight(), CELL, texts.text(labelKey));
         return label(area.centerX(), area.y() + box.valueY(), box.valueHeight(), CELL, Component.empty());
     }
 
@@ -397,7 +399,7 @@ final class View {
     }
 
     private Component tileText(int value, Settings.TileColors colors) {
-        return settings.text("board.tile", "%value%", value).colorIfAbsent(TextColor.color(colors.text().asRGB()));
+        return texts.text("board.tile", "%value%", value).colorIfAbsent(TextColor.color(colors.text().asRGB()));
     }
 
     private void place(Tile tile, int cell, float scale, int ticks) {

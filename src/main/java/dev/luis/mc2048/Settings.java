@@ -12,6 +12,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
@@ -119,10 +120,28 @@ public final class Settings {
     private final Map<String, List<Sound>> sounds = new HashMap<>();
     public final float mergePitchStep;
     public final float mergePitchMax;
-    private final FileConfiguration messages;
+    private final Texts fallback;
+    private final Map<String, Texts> languages = new HashMap<>();
 
-    public Settings(FileConfiguration config, FileConfiguration messages) {
-        this.messages = messages;
+    public static final class Texts {
+        private final FileConfiguration messages;
+
+        private Texts(FileConfiguration messages) {
+            this.messages = messages;
+        }
+
+        public Component text(String path) {
+            return LEGACY.deserialize(Objects.requireNonNullElse(messages.getString(path), "")).replaceText(KEYBINDS);
+        }
+
+        public Component text(String path, String placeholder, Object value) {
+            return LEGACY.deserialize(Objects.requireNonNullElse(messages.getString(path), "").replace(placeholder, String.valueOf(value)));
+        }
+    }
+
+    public Settings(FileConfiguration config, FileConfiguration messages, Map<String, FileConfiguration> languages) {
+        this.fallback = new Texts(messages);
+        languages.forEach((language, file) -> this.languages.put(language, new Texts(file)));
         size = config.getInt("game.size");
         startTiles = config.getInt("game.start-tiles");
         winValue = config.getInt("game.win-value");
@@ -245,12 +264,12 @@ public final class Settings {
         return tileColors.getOrDefault(value, superTile);
     }
 
-    public Component text(String path) {
-        return LEGACY.deserialize(Objects.requireNonNullElse(messages.getString(path), "")).replaceText(KEYBINDS);
+    public Texts texts(Locale locale) {
+        return languages.getOrDefault(locale.getLanguage(), fallback);
     }
 
-    public Component text(String path, String placeholder, Object value) {
-        return LEGACY.deserialize(Objects.requireNonNullElse(messages.getString(path), "").replace(placeholder, String.valueOf(value)));
+    public Component text(String path) {
+        return fallback.text(path);
     }
 
     private static Area area(ConfigurationSection section) {

@@ -2,6 +2,7 @@ package dev.luis.mc2048;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -26,19 +27,27 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class Mc2048 extends JavaPlugin implements Listener {
 
     private static final String MESSAGES = "messages.yml";
     private static final String PLAYERS = "players";
     private static final String PLACEHOLDER_API = "PlaceholderAPI";
+    private static final String LANGUAGE_FILE = "messages_%s.yml";
+    private static final Pattern LANGUAGE_PATTERN = Pattern.compile("messages_([a-z]{2,3})\\.yml");
+    private static final List<String> BUNDLED_LANGUAGES = List.of("de");
 
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
     private final Set<UUID> opening = ConcurrentHashMap.newKeySet();
@@ -49,11 +58,21 @@ public final class Mc2048 extends JavaPlugin implements Listener {
     public void onEnable() {
         saveDefaultConfig();
         getConfig().options().copyDefaults(true);
-        File messages = new File(getDataFolder(), MESSAGES);
-        if (!messages.exists()) saveResource(MESSAGES, false);
-        YamlConfiguration loaded = YamlConfiguration.loadConfiguration(messages);
-        loaded.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(getResource(MESSAGES), StandardCharsets.UTF_8)));
-        settings = new Settings(getConfig(), loaded);
+        if (!new File(getDataFolder(), MESSAGES).exists()) saveResource(MESSAGES, false);
+        for (String language : BUNDLED_LANGUAGES) {
+            String name = String.format(LANGUAGE_FILE, language);
+            if (!new File(getDataFolder(), name).exists()) saveResource(name, false);
+        }
+        YamlConfiguration english = messages(MESSAGES, null);
+        Map<String, FileConfiguration> languages = new HashMap<>();
+        File[] files = getDataFolder().listFiles((folder, name) -> LANGUAGE_PATTERN.matcher(name).matches());
+        if (files != null) {
+            for (File file : files) {
+                Matcher matcher = LANGUAGE_PATTERN.matcher(file.getName());
+                if (matcher.matches()) languages.put(matcher.group(1), messages(file.getName(), english));
+            }
+        }
+        settings = new Settings(getConfig(), english, languages);
         store = new Store(new File(getDataFolder(), PLAYERS));
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getOnlinePlayers().forEach(player -> store.preload(player.getUniqueId()));
@@ -76,6 +95,15 @@ public final class Mc2048 extends JavaPlugin implements Listener {
         if (session != null) session.close(true);
         else open(player);
         return true;
+    }
+
+    private YamlConfiguration messages(String name, YamlConfiguration fallback) {
+        YamlConfiguration file = YamlConfiguration.loadConfiguration(new File(getDataFolder(), name));
+        InputStream bundled = getResource(name);
+        YamlConfiguration defaults = bundled == null ? fallback : YamlConfiguration.loadConfiguration(new InputStreamReader(bundled, StandardCharsets.UTF_8));
+        if (bundled != null && fallback != null) defaults.setDefaults(fallback);
+        if (defaults != null) file.setDefaults(defaults);
+        return file;
     }
 
     Store store() {
