@@ -27,6 +27,15 @@ animation:
   float-ticks: 12
   float-distance: 60
   cursor-ticks: 1
+  confetti:
+    count: 40
+    min-size: 9
+    max-size: 15
+    spread: 260
+    fall: 320
+    burst-ticks: 8
+    fall-ticks: 26
+    colors: ['#edc22e', '#f65e3b', '#f2b179', '#f67c5f', '#edcf72', '#eee4da']
 
 layout:
   unit: 0.0055

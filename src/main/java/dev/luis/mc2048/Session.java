@@ -191,8 +191,10 @@ final class Session {
         int merged = turn.merges().stream().mapToInt(Game.Merge::value).max().orElse(0);
         if (merged == 0) play("slide", 0);
         else play("merge", (float) Math.min(settings.mergePitchMax, settings.mergePitchStep * (Integer.numberOfTrailingZeros(merged) - 2)));
+        boolean reached = shownOverlay != View.Overlay.WON && game.showWin();
         view.render(turn);
         refresh(turn.gained());
+        if (reached) view.confetti();
     }
 
     private void refresh(int gained) {

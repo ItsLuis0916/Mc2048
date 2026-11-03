@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -53,6 +54,7 @@ final class View {
     private static final int FLOAT = 6;
     private static final int OVERLAY = 7;
     private static final int OVERLAY_BUTTON = 8;
+    private static final int CONFETTI = 9;
     private static final int CURSOR = 10;
 
     private record Pending(long due, Runnable action) {}
@@ -243,6 +245,40 @@ final class View {
             d.setTextOpacity(FADED);
         }));
         later(settings.floatTicks + 1, floating::remove);
+    }
+
+    void confetti() {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        Settings.Area board = settings.board;
+        List<Color> colors = settings.confettiColors;
+        if (colors.isEmpty()) return;
+        for (int i = 0; i < settings.confettiCount; i++) {
+            double size = settings.confettiMinSize + random.nextDouble() * (settings.confettiMaxSize - settings.confettiMinSize);
+            double direction = random.nextDouble() * Math.PI * 2;
+            double distance = settings.confettiSpread * (0.4 + random.nextDouble() * 0.6);
+            double burstX = board.centerX() + Math.cos(direction) * distance;
+            double burstY = board.centerY() + Math.sin(direction) * distance * 0.7 - settings.confettiSpread * 0.3;
+            double landX = burstX + (random.nextDouble() - 0.5) * settings.confettiSpread * 0.4;
+            double landY = burstY + settings.confettiFall * (0.6 + random.nextDouble() * 0.4);
+            float spin = (float) ((random.nextDouble() - 0.5) * Math.PI * 4);
+            Color color = colors.get(random.nextInt(colors.size()));
+            Part piece = spawn(d -> {
+                d.text(Component.text(BLOCK));
+                d.setBackgroundColor(color);
+            }, () -> pieceTransform(board.centerX(), board.centerY(), size, 0, HIDDEN));
+            later(1, () -> piece.animate(settings.confettiBurstTicks, d -> d.setTransformation(pieceTransform(burstX, burstY, size, spin / 2, 1))));
+            later(1 + settings.confettiBurstTicks, () -> piece.animate(settings.confettiFallTicks, d -> d.setTransformation(pieceTransform(landX, landY, size, spin, HIDDEN))));
+            later(1 + settings.confettiBurstTicks + settings.confettiFallTicks, piece::remove);
+        }
+    }
+
+    private Transformation pieceTransform(double x, double y, double size, float angle, float scale) {
+        float sx = (float) (size * unit() / (BLOCK_WIDTH * PIXEL)) * scale;
+        float sy = (float) (size * unit() / (BLOCK_HEIGHT * PIXEL)) * scale;
+        Quaternionf rotation = new Quaternionf().rotateZ(angle);
+        Vector3f offset = new Vector3f(BLOCK_SHIFT_X * PIXEL * sx, BLOCK_HEIGHT / 2 * PIXEL * sy, 0).rotate(rotation);
+        Vector3f translation = new Vector3f(localX(x) - offset.x, localY(y) - offset.y, localZ(CONFETTI));
+        return new Transformation(translation, rotation, new Vector3f(sx, sy, 1), new Quaternionf());
     }
 
     void undoEnabled(boolean enabled) {
