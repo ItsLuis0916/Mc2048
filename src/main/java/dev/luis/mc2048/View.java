@@ -209,7 +209,7 @@ final class View {
             Tile tile = tiles.get(slide.id());
             if (tile != null) place(tile, slide.to(), 1, settings.slideTicks);
         }
-        later(settings.slideTicks, () -> {
+        later(settings.slideTicks + settings.settleTicks, () -> {
             for (Game.Merge merge : turn.merges()) {
                 Tile second = tiles.remove(merge.second());
                 if (second != null) removeTile(second);

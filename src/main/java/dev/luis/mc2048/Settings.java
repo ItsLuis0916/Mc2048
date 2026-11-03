@@ -59,6 +59,7 @@ public final class Settings {
 
     public final int slideTicks;
     public final int popTicks;
+    public final int settleTicks;
     public final float popScale;
     public final int appearTicks;
     public final int floatTicks;
@@ -170,6 +171,7 @@ public final class Settings {
 
         slideTicks = config.getInt("animation.slide-ticks");
         popTicks = config.getInt("animation.pop-ticks");
+        settleTicks = config.getInt("animation.settle-ticks");
         popScale = (float) config.getDouble("animation.pop-scale");
         appearTicks = config.getInt("animation.appear-ticks");
         floatTicks = config.getInt("animation.float-ticks");

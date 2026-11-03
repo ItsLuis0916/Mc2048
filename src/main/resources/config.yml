@@ -21,6 +21,7 @@ camera:
 
 animation:
   slide-ticks: 2
+  settle-ticks: 1
   pop-ticks: 2
   pop-scale: 1.2
   appear-ticks: 3
