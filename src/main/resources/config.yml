@@ -8,6 +8,7 @@ game:
 camera:
   distance: 3.2
   lens-offset: 0.5
+  hint-clear-ticks: 2
   zoom:
     default: 1.5
     min: 0.6

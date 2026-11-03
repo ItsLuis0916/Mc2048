@@ -48,6 +48,7 @@ public final class Settings {
 
     public final double distance;
     public final double lensOffset;
+    public final int hintClearTicks;
     public final double zoomDefault;
     public final double zoomMin;
     public final double zoomMax;
@@ -160,6 +161,7 @@ public final class Settings {
 
         distance = config.getDouble("camera.distance");
         lensOffset = config.getDouble("camera.lens-offset");
+        hintClearTicks = config.getInt("camera.hint-clear-ticks");
         zoomDefault = config.getDouble("camera.zoom.default");
         zoomMin = config.getDouble("camera.zoom.min");
         zoomMax = config.getDouble("camera.zoom.max");

@@ -3,6 +3,7 @@ package dev.luis.mc2048;
 import io.papermc.paper.math.Position;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.sound.Sound;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Input;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -104,6 +105,9 @@ final class Session {
             close(false);
             return false;
         }
+        player.getScheduler().runDelayed(plugin, task -> {
+            if (!closed) player.sendActionBar(Component.empty());
+        }, null, Math.max(1, settings.hintClearTicks));
         task = player.getScheduler().runAtFixedRate(plugin, scheduled -> tick(), () -> close(false), 1, 1);
         player.sendMessage(texts.text("start"));
         play("open", 0);
