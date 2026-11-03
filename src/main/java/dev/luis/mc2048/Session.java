@@ -194,6 +194,7 @@ final class Session {
     }
 
     private void refresh(int gained, int overlayDelay) {
+        plugin.store().remember(player.getUniqueId(), game);
         view.score(game.score(), game.best(), gained);
         view.undoEnabled(game.canUndo());
         View.Overlay overlay = game.showWin() ? View.Overlay.WON : game.over() ? View.Overlay.OVER : View.Overlay.NONE;

@@ -3,6 +3,7 @@ version: '${version}'
 main: dev.luis.mc2048.Mc2048
 api-version: '26.2'
 folia-supported: true
+softdepend: [ PlaceholderAPI ]
 authors: [ luis ]
 description: 2048 built from display entities, no resource pack needed.
 

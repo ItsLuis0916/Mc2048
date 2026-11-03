@@ -9,15 +9,22 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class Store {
 
+    public record Record(int best, int score, int highest) {}
+
+    private static final Record EMPTY = new Record(0, 0, 0);
+
     private final File folder;
     private final ExecutorService io = Executors.newSingleThreadExecutor(Thread.ofVirtual().factory());
+    private final Map<UUID, Record> records = new ConcurrentHashMap<>();
 
     public Store(File folder) {
         this.folder = folder;
@@ -37,6 +44,7 @@ public final class Store {
             game.load(cells, yaml.getInt("score"), yaml.getInt("best"), yaml.getBoolean("won"),
                     yaml.getBoolean("keep-playing"), undo.length == cells.length ? undo : null,
                     yaml.getInt("undo.score"), yaml.getInt("undo.lock"));
+            remember(uuid, game);
             return new Saved(true, zoom);
         }, io);
     }
@@ -65,6 +73,28 @@ public final class Store {
                 throw new UncheckedIOException(exception);
             }
         });
+    }
+
+    public Record record(UUID uuid) {
+        return records.getOrDefault(uuid, EMPTY);
+    }
+
+    public void remember(UUID uuid, Game game) {
+        records.put(uuid, new Record(game.best(), game.score(), game.highest()));
+    }
+
+    public void preload(UUID uuid) {
+        io.execute(() -> {
+            File file = file(uuid);
+            if (!file.isFile()) return;
+            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+            int highest = yaml.getIntegerList("cells").stream().mapToInt(Integer::intValue).max().orElse(0);
+            records.putIfAbsent(uuid, new Record(yaml.getInt("best"), yaml.getInt("score"), highest));
+        });
+    }
+
+    public void forget(UUID uuid) {
+        records.remove(uuid);
     }
 
     public void close() {

@@ -43,6 +43,18 @@ The + and - buttons change the board size. The chat message at the start shows y
 
 Running `/2048` again while playing leaves the game.
 
+## Placeholders
+
+With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, for TAB, scoreboards and so on:
+
+| Placeholder | Value |
+|---|---|
+| `%2048_best%` | Best score |
+| `%2048_score%` | Score of the current or last game |
+| `%2048_highest%` | Highest tile on the board |
+
+PlaceholderAPI is optional, the plugin runs fine without it.
+
 ## How it works
 
 - Every rectangle is a text display with a single space as text and a coloured background, scaled to size. Numbers and labels are text displays without a background. All of them are only shown to the player who plays.

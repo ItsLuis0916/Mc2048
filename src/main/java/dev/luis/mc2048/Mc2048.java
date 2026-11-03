@@ -19,6 +19,7 @@ import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.event.player.PlayerInputEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -37,6 +38,7 @@ public final class Mc2048 extends JavaPlugin implements Listener {
 
     private static final String MESSAGES = "messages.yml";
     private static final String PLAYERS = "players";
+    private static final String PLACEHOLDER_API = "PlaceholderAPI";
 
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
     private final Set<UUID> opening = ConcurrentHashMap.newKeySet();
@@ -54,6 +56,8 @@ public final class Mc2048 extends JavaPlugin implements Listener {
         settings = new Settings(getConfig(), loaded);
         store = new Store(new File(getDataFolder(), PLAYERS));
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getOnlinePlayers().forEach(player -> store.preload(player.getUniqueId()));
+        if (getServer().getPluginManager().isPluginEnabled(PLACEHOLDER_API)) new Placeholders(this).register();
     }
 
     @Override
@@ -170,9 +174,15 @@ public final class Mc2048 extends JavaPlugin implements Listener {
     }
 
     @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        store.preload(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         Session session = session(event.getPlayer());
         if (session != null) session.close(false);
+        store.forget(event.getPlayer().getUniqueId());
     }
 
     private void close(Player player) {

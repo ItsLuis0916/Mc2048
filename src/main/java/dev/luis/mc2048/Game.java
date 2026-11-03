@@ -106,7 +106,7 @@ public final class Game {
         score = undoScore;
         undoValues = null;
         undoLock = undoCooldown;
-        won = won && maxValue() >= winValue;
+        won = won && highest() >= winValue;
         assignIds();
         return true;
     }
@@ -178,7 +178,7 @@ public final class Game {
         for (int i = 0; i < values.length; i++) ids[i] = values[i] == 0 ? 0 : nextId++;
     }
 
-    private int maxValue() {
+    public int highest() {
         int max = 0;
         for (int value : values) max = Math.max(max, value);
         return max;
