@@ -1,5 +1,7 @@
 # Mc2048
 
+<p align="center"><img src="docs/preview.gif" alt="2048 in Minecraft" width="360"></p>
+
 2048 inside Minecraft, built only from text display entities. No resource pack, no client mod.
 
 Type `/2048` and the screen goes black, the board appears in front of you and you play with the keys you already use to walk. Made for lobbies, so players have something to do while they wait.
