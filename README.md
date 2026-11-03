@@ -7,7 +7,7 @@ Type `/2048` and the screen goes black, the board appears in front of you and yo
 ## Features
 
 - Looks like the original game: same colours, layout, score and best boxes
-- Tiles slide, new tiles pop in, merged tiles pulse, points float up from the score
+- Tiles slide, new tiles pop in, merged tiles pulse, points float up from the score, tiles from 128 up glow
 - Mouse pointer that stays on the board, buttons light up when you hover them
 - Undo: one step back, then two moves before it can be used again
 - Win and game over screens with keep going, try again and undo
@@ -58,6 +58,7 @@ Saves are in `plugins/2048/players/<uuid>.yml`.
 
 - F5 cannot be blocked from the server. Both third person views show the same board.
 - Text display backgrounds are rectangles, so tiles have square corners.
+- Display backgrounds are drawn in one batch in no fixed order, so nothing on the board is see-through. Glow and overlays use colours mixed with the board colour instead.
 - The code uses Folia's schedulers, but it has only been tested on Paper.
 
 ## Building

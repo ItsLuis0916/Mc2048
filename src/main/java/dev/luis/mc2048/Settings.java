@@ -45,7 +45,6 @@ public final class Settings {
     public final int undoCooldown;
 
     public final double distance;
-    public final int attachDelay;
     public final double lensOffset;
     public final double zoomDefault;
     public final double zoomMin;
@@ -97,6 +96,11 @@ public final class Settings {
     public final double overlayButtonGap;
     public final double overlayButtonTextHeight;
     public final double floatTextHeight;
+    public final int glowFrom;
+    public final Color glowColor;
+    public final double glowMinAlpha;
+    public final double glowMaxAlpha;
+    public final double glowMargin;
     public final double hintY;
     public final double hintTextHeight;
     public final double backdropSize;
@@ -126,7 +130,6 @@ public final class Settings {
         undoCooldown = config.getInt("game.undo-cooldown");
 
         distance = config.getDouble("camera.distance");
-        attachDelay = Math.max(1, config.getInt("camera.attach-delay-ticks"));
         lensOffset = config.getDouble("camera.lens-offset");
         zoomDefault = config.getDouble("camera.zoom.default");
         zoomMin = config.getDouble("camera.zoom.min");
@@ -180,6 +183,11 @@ public final class Settings {
         overlayButtonGap = layout.getDouble("overlay.button-gap");
         overlayButtonTextHeight = layout.getDouble("overlay.button-text-height");
         floatTextHeight = layout.getDouble("float.text-height");
+        glowFrom = Math.max(1, layout.getInt("tiles.glow.from"));
+        glowColor = color(layout.getString("tiles.glow.color"));
+        glowMinAlpha = layout.getDouble("tiles.glow.min-alpha");
+        glowMaxAlpha = layout.getDouble("tiles.glow.max-alpha");
+        glowMargin = layout.getDouble("tiles.glow.margin");
         hintY = layout.getDouble("hint.y");
         hintTextHeight = layout.getDouble("hint.text-height");
         backdropSize = layout.getDouble("backdrop.size");

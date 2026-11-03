@@ -47,12 +47,13 @@ final class View {
     private static final int PAGE = 0;
     private static final int PANEL = 1;
     private static final int CELL = 2;
-    private static final int TILE = 3;
-    private static final int TILE_TEXT = 4;
-    private static final int FLOAT = 5;
-    private static final int OVERLAY = 6;
-    private static final int OVERLAY_BUTTON = 7;
-    private static final int CURSOR = 9;
+    private static final int GLOW = 3;
+    private static final int TILE = 4;
+    private static final int TILE_TEXT = 5;
+    private static final int FLOAT = 6;
+    private static final int OVERLAY = 7;
+    private static final int OVERLAY_BUTTON = 8;
+    private static final int CURSOR = 10;
 
     private record Pending(long due, Runnable action) {}
 
@@ -81,6 +82,7 @@ final class View {
     private static final class Tile {
         private final Part background;
         private final Part number;
+        private Part glow;
         private int value;
 
         private Tile(Part background, Part number) {
@@ -285,8 +287,8 @@ final class View {
 
     private void showOverlay(Overlay next, boolean canUndo) {
         Settings.Area board = settings.board;
-        Color color = next == Overlay.WON ? settings.overlayWon : settings.overlayOver;
-        Part background = rect(board, OVERLAY, CLEAR);
+        Color color = over(next == Overlay.WON ? settings.overlayWon : settings.overlayOver, settings.boardColor);
+        Part background = rect(board, OVERLAY, color);
         overlayParts.add(background);
         Part text = label(board.centerX(), board.y() + settings.overlayTextY, settings.overlayTextHeight, OVERLAY_BUTTON + 1,
                 settings.text(next == Overlay.WON ? "board.won" : "board.over"));
@@ -315,10 +317,7 @@ final class View {
             overlayParts.add(button.label);
             x += width + settings.overlayButtonGap;
         }
-        later(1, () -> {
-            background.animate(settings.overlayTicks, d -> d.setBackgroundColor(color));
-            text.animate(settings.overlayTicks, d -> d.setTextOpacity(OPAQUE));
-        });
+        later(1, () -> text.animate(settings.overlayTicks, d -> d.setTextOpacity(OPAQUE)));
     }
 
     private List<Button> allButtons() {
@@ -344,6 +343,7 @@ final class View {
         Settings.TileColors colors = settings.tileColors(value);
         double size = settings.cellSize();
         double height = settings.tileTextHeight(value);
+        Part glow = value < settings.glowFrom ? null : glow(value, cell, scale);
         Part background = spawn(d -> {
             d.text(Component.text(BLOCK));
             d.setBackgroundColor(colors.background());
@@ -354,6 +354,7 @@ final class View {
             d.setTransformation(labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, scale));
         }, () -> labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, 1));
         Tile tile = new Tile(background, number);
+        tile.glow = glow;
         tile.value = value;
         return tile;
     }
@@ -362,8 +363,37 @@ final class View {
         tile.value = value;
         Settings.TileColors colors = settings.tileColors(value);
         Component text = tileText(value, colors);
+        Color glow = glowColor(value);
+        if (tile.glow != null) tile.glow.set(d -> d.setBackgroundColor(glow));
         tile.background.set(d -> d.setBackgroundColor(colors.background()));
         tile.number.set(d -> d.text(text));
+    }
+
+    private Part glow(int value, int cell, float scale) {
+        double halo = settings.cellSize() + settings.glowMargin * 2;
+        Color color = glowColor(value);
+        return spawn(d -> {
+            d.text(Component.text(BLOCK));
+            d.setBackgroundColor(color);
+            d.setTransformation(rectTransform(cellX(cell), cellY(cell), halo, halo, GLOW, scale));
+        }, () -> rectTransform(cellX(cell), cellY(cell), halo, halo, GLOW, 1));
+    }
+
+    private Color glowColor(int value) {
+        if (value < settings.glowFrom) return CLEAR;
+        double steps = Math.log(settings.winValue / (double) settings.glowFrom) / Math.log(2);
+        double step = Math.min(1, Math.log(value / (double) settings.glowFrom) / Math.log(2) / Math.max(1, steps));
+        double share = settings.glowMinAlpha + (settings.glowMaxAlpha - settings.glowMinAlpha) * step;
+        int alpha = (int) Math.round(255 * share);
+        return over(Color.fromARGB(alpha, settings.glowColor.getRed(), settings.glowColor.getGreen(), settings.glowColor.getBlue()), settings.boardColor);
+    }
+
+    private static Color over(Color top, Color bottom) {
+        double alpha = top.getAlpha() / 255.0;
+        return Color.fromRGB(
+                (int) Math.round(top.getRed() * alpha + bottom.getRed() * (1 - alpha)),
+                (int) Math.round(top.getGreen() * alpha + bottom.getGreen() * (1 - alpha)),
+                (int) Math.round(top.getBlue() * alpha + bottom.getBlue() * (1 - alpha)));
     }
 
     private Component tileText(int value, Settings.TileColors colors) {
@@ -373,6 +403,12 @@ final class View {
     private void place(Tile tile, int cell, float scale, int ticks) {
         double size = settings.cellSize();
         double height = settings.tileTextHeight(tile.value);
+        double halo = size + settings.glowMargin * 2;
+        if (tile.glow == null && tile.value >= settings.glowFrom) tile.glow = glow(tile.value, cell, 1);
+        if (tile.glow != null) {
+            tile.glow.animate(ticks, d -> d.setTransformation(rectTransform(cellX(cell), cellY(cell), halo, halo, GLOW, scale)));
+            tile.glow.layout = () -> rectTransform(cellX(cell), cellY(cell), halo, halo, GLOW, 1);
+        }
         tile.background.animate(ticks, d -> d.setTransformation(rectTransform(cellX(cell), cellY(cell), size, size, TILE, scale)));
         tile.number.animate(ticks, d -> d.setTransformation(labelTransform(cellX(cell), cellY(cell), height, TILE_TEXT, scale)));
         tile.background.layout = () -> rectTransform(cellX(cell), cellY(cell), size, size, TILE, 1);
@@ -380,6 +416,7 @@ final class View {
     }
 
     private void removeTile(Tile tile) {
+        if (tile.glow != null) tile.glow.remove();
         tile.background.remove();
         tile.number.remove();
     }

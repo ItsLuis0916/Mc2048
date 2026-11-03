@@ -63,16 +63,6 @@ final class Session {
     boolean open() {
         Location feet = player.getLocation();
         World world = feet.getWorld();
-        seat = world.spawn(feet, ItemDisplay.class, display -> {
-            display.setPersistent(false);
-            display.setVisibleByDefault(false);
-            ClientView.keepFeet(display, player);
-        });
-        player.showEntity(plugin, seat);
-        if (!seat.addPassenger(player)) {
-            View.kill(plugin, seat);
-            return false;
-        }
         yaw = Math.round(feet.getYaw() / YAW_STEP) * YAW_STEP;
         Location lens = player.getEyeLocation();
         lens.setYaw(yaw);
@@ -99,11 +89,19 @@ final class Session {
             if (distance != null) distance.setBaseValue(0);
         });
         player.showEntity(plugin, camera);
+        client.attach(camera, yaw, 0);
         yawAnchor = yaw;
         pitchAnchor = 0;
-        player.getScheduler().runDelayed(plugin, scheduled -> {
-            if (!closed) client.attach(camera, yaw, 0);
-        }, null, settings.attachDelay);
+        seat = world.spawn(feet, ItemDisplay.class, display -> {
+            display.setPersistent(false);
+            display.setVisibleByDefault(false);
+            ClientView.keepFeet(display, player);
+        });
+        player.showEntity(plugin, seat);
+        if (!seat.addPassenger(player)) {
+            close(false);
+            return false;
+        }
         task = player.getScheduler().runAtFixedRate(plugin, scheduled -> tick(), () -> close(false), 1, 1);
         player.sendMessage(settings.text("start"));
         play("open", 0);
