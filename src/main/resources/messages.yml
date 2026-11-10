@@ -11,6 +11,7 @@ board:
   tile: '&l%value%'
   undo: '&#f9f6f2&lUndo'
   restart: '&#f9f6f2&lNew Game'
+  menu: '&#f9f6f2&lMenu'
   leave: '&#f9f6f2&lLeave'
   zoom-in: '&#f9f6f2&l+'
   zoom-out: '&#f9f6f2&l-'
@@ -19,3 +20,11 @@ board:
   over: '&#776e65&lGame over!'
   keep-going: '&#f9f6f2&lKeep going'
   try-again: '&#f9f6f2&lTry again'
+
+menu:
+  subtitle: '&#776e65&lChoose a size'
+  size: '&#f9f6f2&l%size%x%size%'
+  best: '&#eee4da&lBest %value%'
+  empty: '&#eee4da&lNot played yet'
+  back: '&#f9f6f2&lBack'
+  hint: '&#f9f6f2Click a size to play  &#776e65|  &#f9f6f2Sneak to leave'

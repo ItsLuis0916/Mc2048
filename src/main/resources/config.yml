@@ -1,5 +1,5 @@
 game:
-  size: 4
+  sizes: [4, 6, 8]
   start-tiles: 2
   win-value: 2048
   four-chance: 0.1
@@ -105,6 +105,28 @@ layout:
     width: 130
     height: 40
     text-height: 13
+  menu:
+    title-y: 110
+    title-height: 70
+    subtitle-y: 190
+    subtitle-height: 14
+    card-y: 250
+    margin: 14
+    card-gap: 15
+    pad: 12
+    cell: 20
+    cell-gap: 3
+    name-y: 28
+    name-height: 26
+    preview-y: 56
+    best-gap: 18
+    best-height: 11
+    back:
+      x: 205
+      y: 650
+      width: 150
+      height: 40
+      text-height: 13
   button:
     color: '#8f7a66'
     hover: '#a08a76'
@@ -114,6 +136,7 @@ layout:
     y: 200
     size: 500
     gap: 15
+    reference-size: 4
     color: '#bbada0'
     cell: '#cdc1b4'
   overlay:

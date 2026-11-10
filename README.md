@@ -4,7 +4,7 @@
 
 2048 inside Minecraft, built only from text display entities. No resource pack, no client mod.
 
-Type `/2048` and the screen goes black, the board appears in front of you and you play with the keys you already use to walk. Made for lobbies, so players have something to do while they wait.
+Type `/2048` and the screen goes black, a menu lets you pick 4x4, 6x6 or 8x8, the board appears in front of you and you play with the keys you already use to walk. Made for lobbies, so players have something to do while they wait.
 
 ## Features
 
@@ -13,7 +13,8 @@ Type `/2048` and the screen goes black, the board appears in front of you and yo
 - Mouse pointer that stays on the board, buttons light up when you hover them
 - Undo: one step back, then two moves before it can be used again
 - Win and game over screens with keep going, try again and undo
-- Game and best score are saved per player, `/2048` continues where you left off
+- Board sizes 4x4, 6x6 and 8x8 from a menu, the sizes are set in `config.yml` (`game.sizes`)
+- Game and best score are saved per player and per size, picking a size continues where you left off
 - Board size per player with the + and - buttons, so it fits any FOV
 - No crosshair, hotbar or hearts while playing, only the board on black
 - Short note block sounds for moves, merges, buttons, win and game over, all set in `config.yml`
@@ -34,7 +35,7 @@ The plugin talks to the server internals for the camera and the hidden hotbar, s
 | W A S D | Slide the tiles |
 | Mouse | Move the pointer |
 | Left click | Press a button |
-| Sneak | Leave (the Leave button does the same) |
+| Sneak | Leave |
 
 The + and - buttons change the board size. The chat message at the start shows your own key bindings.
 
@@ -52,7 +53,7 @@ With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, for
 
 | Placeholder | Value |
 |---|---|
-| `%2048_best%` | Best score |
+| `%2048_best%` | Best score over all sizes |
 | `%2048_score%` | Score of the current or last game |
 | `%2048_highest%` | Highest tile on the board |
 
@@ -66,6 +67,8 @@ PlaceholderAPI is optional, the plugin runs fine without it.
 - Only the player's client is told it is in spectator mode, which hides crosshair, hotbar and hearts. On the server the game mode never changes.
 - The hand is hidden by marking the player invisible and sending an empty hotbar, only to that player. The real inventory is never touched.
 - Taking damage, teleporting, changing worlds or quitting ends the game and saves it.
+
+The Menu button saves the game and goes back to the size menu, Back there leaves. With a single size in `game.sizes` the menu is skipped.
 
 Saves are in `plugins/2048/players/<uuid>.yml`.
 

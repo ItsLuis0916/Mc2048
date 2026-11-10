@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
@@ -114,18 +115,30 @@ public final class Mc2048 extends JavaPlugin implements Listener {
         sessions.remove(uuid, session);
     }
 
+    CompletableFuture<Game> game(UUID uuid, int size) {
+        Game game = new Game(size, settings.winValue, settings.fourChance, settings.undoCooldown, ThreadLocalRandom.current());
+        return store.load(uuid, game).exceptionally(error -> false).thenApply(found -> {
+            if (!found) game.restart(settings.startTiles);
+            return game;
+        });
+    }
+
     private void open(Player player) {
         UUID uuid = player.getUniqueId();
         if (!opening.add(uuid)) return;
-        Game game = new Game(settings.size, settings.winValue, settings.fourChance, settings.undoCooldown, ThreadLocalRandom.current());
-        store.load(uuid, game, settings.zoomDefault).whenComplete((saved, error) -> player.getScheduler().run(this, task -> {
-            opening.remove(uuid);
-            if (!player.isOnline() || sessions.containsKey(uuid)) return;
-            if (saved == null || !saved.game()) game.restart(settings.startTiles);
-            Session session = new Session(this, settings, player, game, saved == null ? settings.zoomDefault : saved.zoom());
-            sessions.put(uuid, session);
-            if (!session.open()) sessions.remove(uuid, session);
-        }, () -> opening.remove(uuid)));
+        boolean menu = settings.sizes.size() > 1;
+        CompletableFuture<Game> first = menu ? CompletableFuture.completedFuture(null) : game(uuid, settings.sizes.getFirst());
+        store.profile(uuid, settings.zoomDefault).exceptionally(error -> new Store.Profile(settings.zoomDefault, Map.of()))
+                .thenCombine(first, (profile, game) -> {
+                    player.getScheduler().run(this, task -> {
+                        opening.remove(uuid);
+                        if (!player.isOnline() || sessions.containsKey(uuid)) return;
+                        Session session = new Session(this, settings, player, profile.zoom());
+                        sessions.put(uuid, session);
+                        if (!session.open(profile.slots(), game)) sessions.remove(uuid, session);
+                    }, () -> opening.remove(uuid));
+                    return null;
+                });
     }
 
     private Session session(Player player) {

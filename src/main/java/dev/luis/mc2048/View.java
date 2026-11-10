@@ -26,7 +26,9 @@ import java.util.function.Supplier;
 
 final class View {
 
-    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE, ZOOM_IN, ZOOM_OUT }
+    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE, MENU, PICK, ZOOM_IN, ZOOM_OUT }
+
+    record Click(Action action, int size) {}
 
     enum Overlay { NONE, WON, OVER }
 
@@ -98,14 +100,20 @@ final class View {
         private final Action action;
         private final Part background;
         private final Part label;
+        private final int size;
         private boolean enabled = true;
         private boolean hovered;
 
         private Button(Settings.Area area, Action action, String text, double textHeight, int layer) {
+            this(area, action, texts.text(text), textHeight, area.height() / 2, layer, 0);
+        }
+
+        private Button(Settings.Area area, Action action, Component text, double textHeight, double textY, int layer, int size) {
             this.area = area;
             this.action = action;
+            this.size = size;
             this.background = rect(area, layer, settings.buttonColor);
-            this.label = label(area.centerX(), area.centerY(), textHeight, layer + 1, texts.text(text));
+            this.label = label(area.centerX(), area.y() + textY, textHeight, layer + 1, text);
         }
 
         private void paint() {
@@ -136,6 +144,8 @@ final class View {
     private int shownScore = -1;
     private int shownBest = -1;
     private final Map<Integer, Component> tileTexts = new HashMap<>();
+    private int side;
+    private double fit;
     private double zoom;
     private double pointerX;
     private double pointerY;
@@ -150,29 +160,102 @@ final class View {
     }
 
     void build(Game game) {
-        double backdrop = settings.backdropSize;
-        rect(new Settings.Area((settings.pageWidth - backdrop) / 2, (settings.pageHeight - backdrop) / 2, backdrop, backdrop), BACKDROP, settings.backdropColor);
-        rect(new Settings.Area(0, 0, settings.pageWidth, settings.pageHeight), PAGE, settings.pageColor);
-        label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, PAGE, texts.text("board.hint"));
+        side = game.size();
+        fit = settings.scale(side);
+        page("board.hint");
         label(settings.title.centerX(), settings.title.centerY(), settings.titleHeight, PANEL, texts.text("board.title"));
         scoreValue = scoreBox(settings.score, "board.score");
         bestValue = scoreBox(settings.best, "board.best");
         undo = new Button(settings.undo, Action.UNDO, "board.undo", settings.undoTextHeight, PANEL);
         buttons.add(undo);
         buttons.add(new Button(settings.restart, Action.RESTART, "board.restart", settings.restartTextHeight, PANEL));
-        buttons.add(new Button(settings.leave, Action.LEAVE, "board.leave", settings.leaveTextHeight, PANEL));
+        boolean menu = settings.sizes.size() > 1;
+        buttons.add(new Button(settings.leave, menu ? Action.MENU : Action.LEAVE, menu ? "board.menu" : "board.leave", settings.leaveTextHeight, PANEL));
         buttons.add(new Button(settings.zoomOut, Action.ZOOM_OUT, "board.zoom-out", settings.zoomTextHeight, PANEL));
         buttons.add(new Button(settings.zoomIn, Action.ZOOM_IN, "board.zoom-in", settings.zoomTextHeight, PANEL));
         rect(settings.board, PANEL, settings.boardColor);
-        double cell = settings.cellSize();
-        for (int i = 0; i < settings.size * settings.size; i++) {
+        double cell = settings.cellSize(side);
+        for (int i = 0; i < side * side; i++) {
             rect(new Settings.Area(cellX(i) - cell / 2, cellY(i) - cell / 2, cell, cell), CELL, settings.cellColor);
         }
+        cursor();
+        sync(game, false);
+    }
+
+    void buildMenu(List<Integer> sizes, Map<Integer, Store.Slot> slots) {
+        Settings.Menu menu = settings.menu;
+        page("menu.hint");
+        label(settings.pageWidth / 2, menu.titleY(), menu.titleHeight(), PANEL, texts.text("board.title"));
+        label(settings.pageWidth / 2, menu.subtitleY(), menu.subtitleHeight(), PANEL, texts.text("menu.subtitle"));
+        double cell = menuCell(sizes);
+        double zone = previewSpan(sizes.stream().mapToInt(Integer::intValue).max().orElse(0), cell);
+        double height = menu.previewY() + zone + menu.bestGap() * 2;
+        double x = (settings.pageWidth - sizes.stream().mapToDouble(size -> cardWidth(size, cell)).sum() - (sizes.size() - 1) * menu.cardGap()) / 2;
+        for (int size : sizes) {
+            Settings.Area area = new Settings.Area(x, menu.cardY(), cardWidth(size, cell), height);
+            buttons.add(new Button(area, Action.PICK, texts.text("menu.size", "%size%", size), menu.nameHeight(), menu.nameY(), PANEL, size));
+            Store.Slot slot = slots.get(size);
+            miniBoard(area.x() + menu.pad(), area.y() + menu.previewY(), size, cell, slot == null ? new int[0] : slot.cells());
+            int best = slot == null ? 0 : slot.best();
+            label(area.centerX(), area.y() + menu.previewY() + zone + menu.bestGap(), menu.bestHeight(), PANEL + 1,
+                    best == 0 ? texts.text("menu.empty") : texts.text("menu.best", "%value%", best));
+            x += area.width() + menu.cardGap();
+        }
+        buttons.add(new Button(menu.back(), Action.LEAVE, "menu.back", menu.backHeight(), PANEL));
+        cursor();
+    }
+
+    private double previewSpan(int size, double cell) {
+        return size * cell + (size + 1) * settings.menu.cellGap();
+    }
+
+    private double cardWidth(int size, double cell) {
+        return previewSpan(size, cell) + settings.menu.pad() * 2;
+    }
+
+    private double menuCell(List<Integer> sizes) {
+        Settings.Menu menu = settings.menu;
+        double fixed = (sizes.size() - 1) * menu.cardGap();
+        int cells = 0;
+        for (int size : sizes) {
+            fixed += (size + 1) * menu.cellGap() + menu.pad() * 2;
+            cells += size;
+        }
+        return Math.min(menu.cell(), (settings.pageWidth - menu.margin() * 2 - fixed) / cells);
+    }
+
+    private void miniBoard(double x, double y, int size, double cell, int[] values) {
+        double gap = settings.menu.cellGap();
+        double span = previewSpan(size, cell);
+        double reference = settings.cellSize(settings.referenceSize);
+        rect(new Settings.Area(x, y, span, span), PANEL + 1, settings.boardColor);
+        for (int i = 0; i < size * size; i++) {
+            double centerX = x + gap + (i % size) * (cell + gap) + cell / 2;
+            double centerY = y + gap + (i / size) * (cell + gap) + cell / 2;
+            Settings.Area area = new Settings.Area(centerX - cell / 2, centerY - cell / 2, cell, cell);
+            int value = values.length == size * size ? values[i] : 0;
+            if (value == 0) {
+                rect(area, GLOW, settings.cellColor);
+                continue;
+            }
+            Settings.TileColors colors = settings.tileColors(value);
+            rect(area, TILE, colors.background());
+            label(centerX, centerY, settings.tileTextHeight(value) * cell / reference, TILE_TEXT, tileText(value, colors));
+        }
+    }
+
+    private void page(String hint) {
+        double backdrop = settings.backdropSize;
+        rect(new Settings.Area((settings.pageWidth - backdrop) / 2, (settings.pageHeight - backdrop) / 2, backdrop, backdrop), BACKDROP, settings.backdropColor);
+        rect(new Settings.Area(0, 0, settings.pageWidth, settings.pageHeight), PAGE, settings.pageColor);
+        label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, PAGE, texts.text(hint));
+    }
+
+    private void cursor() {
         double size = settings.cursorSize;
         double inner = size - settings.cursorBorder * 2;
         cursor = rect(new Settings.Area(0, 0, size, size), CURSOR, settings.cursorBorderColor);
         cursorInner = rect(new Settings.Area(0, 0, inner, inner), CURSOR + 1, settings.cursorColor);
-        sync(game, false);
     }
 
     void tick() {
@@ -195,7 +278,7 @@ final class View {
         flush();
         tiles.values().forEach(this::removeTile);
         tiles.clear();
-        for (int cell = 0; cell < settings.size * settings.size; cell++) {
+        for (int cell = 0; cell < side * side; cell++) {
             int value = game.value(cell);
             if (value == 0) continue;
             if (animate) appear(game.id(cell), value, cell);
@@ -333,9 +416,9 @@ final class View {
         }
     }
 
-    Action click() {
-        for (Button button : buttons) if (button.hovered) return button.action;
-        for (Button button : overlayButtons) if (button.hovered) return button.action;
+    Click click() {
+        for (Button button : buttons) if (button.hovered) return new Click(button.action, button.size);
+        for (Button button : overlayButtons) if (button.hovered) return new Click(button.action, button.size);
         return null;
     }
 
@@ -370,10 +453,7 @@ final class View {
             String key = switch (action) {
                 case KEEP_GOING -> "board.keep-going";
                 case UNDO -> "board.undo";
-                case RESTART -> "board.try-again";
-                case LEAVE -> "board.leave";
-                case ZOOM_IN -> "board.zoom-in";
-                case ZOOM_OUT -> "board.zoom-out";
+                default -> "board.try-again";
             };
             Settings.Area area = new Settings.Area(x, board.y() + settings.overlayButtonY, width, settings.overlayButtonHeight);
             Button button = new Button(area, action, key, settings.overlayButtonTextHeight, OVERLAY_BUTTON);
@@ -399,8 +479,8 @@ final class View {
 
     private Tile tile(int value, int cell, float scale) {
         Settings.TileColors colors = settings.tileColors(value);
-        double size = settings.cellSize();
-        double height = settings.tileTextHeight(value);
+        double size = settings.cellSize(side);
+        double height = settings.tileTextHeight(value) * fit;
         Part glow = value < settings.glowFrom ? null : glow(value, cell, scale);
         Part background = spawn(d -> {
             d.text(Component.text(BLOCK));
@@ -428,7 +508,7 @@ final class View {
     }
 
     private Part glow(int value, int cell, float scale) {
-        double halo = settings.cellSize() + settings.glowMargin * 2;
+        double halo = settings.cellSize(side) + settings.glowMargin * fit * 2;
         Color color = glowColor(value);
         return spawn(d -> {
             d.text(Component.text(BLOCK));
@@ -459,9 +539,9 @@ final class View {
     }
 
     private void place(Tile tile, int cell, float scale, int ticks) {
-        double size = settings.cellSize();
-        double height = settings.tileTextHeight(tile.value);
-        double halo = size + settings.glowMargin * 2;
+        double size = settings.cellSize(side);
+        double height = settings.tileTextHeight(tile.value) * fit;
+        double halo = size + settings.glowMargin * fit * 2;
         if (tile.glow == null && tile.value >= settings.glowFrom) tile.glow = glow(tile.value, cell, 1);
         if (tile.glow != null) {
             tile.glow.animate(ticks, d -> d.setTransformation(rectTransform(cellX(cell), cellY(cell), halo, halo, GLOW, scale)));
@@ -493,13 +573,15 @@ final class View {
     }
 
     private double cellX(int cell) {
-        double size = settings.cellSize();
-        return settings.board.x() + settings.gap + (cell % settings.size) * (size + settings.gap) + size / 2;
+        double size = settings.cellSize(side);
+        double gap = settings.gap(side);
+        return settings.board.x() + gap + (cell % side) * (size + gap) + size / 2;
     }
 
     private double cellY(int cell) {
-        double size = settings.cellSize();
-        return settings.board.y() + settings.gap + (cell / settings.size) * (size + settings.gap) + size / 2;
+        double size = settings.cellSize(side);
+        double gap = settings.gap(side);
+        return settings.board.y() + gap + (cell / side) * (size + gap) + size / 2;
     }
 
     private Part rect(Settings.Area area, int layer, Color color) {

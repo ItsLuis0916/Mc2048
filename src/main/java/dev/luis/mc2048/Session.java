@@ -32,7 +32,9 @@ final class Session {
     private final Mc2048 plugin;
     private final Settings settings;
     private final Player player;
-    private final Game game;
+    private final Map<Integer, Store.Slot> slots = new HashMap<>();
+    private List<Location> faces;
+    private Game game;
     private final ClientView client;
     private final Settings.Texts texts;
     private final Map<Position, BlockData> realBlocks = new HashMap<>();
@@ -50,20 +52,21 @@ final class Session {
     private double pointerX = Double.NaN;
     private double pointerY = Double.NaN;
     private boolean closed;
+    private boolean loading;
     private View.Overlay shownOverlay = View.Overlay.NONE;
 
-    Session(Mc2048 plugin, Settings settings, Player player, Game game, double zoom) {
+    Session(Mc2048 plugin, Settings settings, Player player, double zoom) {
         this.plugin = plugin;
         this.settings = settings;
         this.zoom = clampZoom(zoom);
         this.player = player;
-        this.game = game;
         this.client = new ClientView(player);
         this.texts = settings.texts(player.locale());
         this.input = player.getCurrentInput();
     }
 
-    boolean open() {
+    boolean open(Map<Integer, Store.Slot> saved, Game first) {
+        slots.putAll(saved);
         Location feet = player.getLocation();
         World world = feet.getWorld();
         yaw = Math.round(feet.getYaw() / YAW_STEP) * YAW_STEP;
@@ -75,9 +78,9 @@ final class Session {
         Location back = lens.clone();
         Location front = lens.clone();
         front.setYaw(yaw + 180);
-        view = new View(plugin, player, settings, texts, List.of(front, back), zoom);
-        view.build(game);
-        refresh(0);
+        faces = List.of(front, back);
+        if (first == null) swap(menuView());
+        else show(first);
         ear = lens.clone();
         camera = world.spawn(lens, ArmorStand.class, stand -> {
             stand.setPersistent(false);
@@ -119,7 +122,7 @@ final class Session {
         closed = true;
         if (task != null) task.cancel();
         plugin.ended(player.getUniqueId(), this);
-        plugin.store().save(player.getUniqueId(), game, zoom);
+        if (game != null) plugin.store().save(player.getUniqueId(), game, zoom);
         client.detach();
         if (camera != null) View.kill(plugin, camera);
         if (seat != null) {
@@ -150,6 +153,7 @@ final class Session {
             close(true);
             return;
         }
+        if (game == null) return;
         if (next.isForward() && !previous.isForward()) move(Game.Direction.UP);
         if (next.isBackward() && !previous.isBackward()) move(Game.Direction.DOWN);
         if (next.isLeft() && !previous.isLeft()) move(Game.Direction.LEFT);
@@ -157,10 +161,19 @@ final class Session {
     }
 
     void click() {
-        View.Action action = view.click();
-        if (action == null) return;
+        View.Click click = view.click();
+        if (click == null) return;
+        View.Action action = click.action();
         play(action == View.Action.UNDO ? "undo" : action == View.Action.RESTART ? "restart" : "click", 0);
         switch (action) {
+            case PICK -> {
+                pick(click.size());
+                return;
+            }
+            case MENU -> {
+                menu();
+                return;
+            }
             case UNDO -> {
                 if (!game.undo()) return;
                 view.sync(game, false);
@@ -184,6 +197,48 @@ final class Session {
             }
         }
         refresh(0);
+    }
+
+    private void pick(int size) {
+        if (loading) return;
+        loading = true;
+        plugin.game(player.getUniqueId(), size).thenAccept(next -> player.getScheduler().run(plugin, task -> {
+            loading = false;
+            if (!closed) show(next);
+        }, () -> loading = false));
+    }
+
+    private void show(Game next) {
+        game = next;
+        shownOverlay = View.Overlay.NONE;
+        View board = newView();
+        board.build(game);
+        swap(board);
+        refresh(0);
+    }
+
+    private void menu() {
+        plugin.store().save(player.getUniqueId(), game, zoom);
+        slots.put(game.size(), new Store.Slot(game.best(), game.cells()));
+        game = null;
+        swap(menuView());
+    }
+
+    private View menuView() {
+        View menu = newView();
+        menu.buildMenu(settings.sizes, slots);
+        return menu;
+    }
+
+    private View newView() {
+        return new View(plugin, player, settings, texts, faces, zoom);
+    }
+
+    private void swap(View next) {
+        if (view != null) view.remove();
+        view = next;
+        pointerX = Double.NaN;
+        pointerY = Double.NaN;
     }
 
     private void move(Game.Direction direction) {

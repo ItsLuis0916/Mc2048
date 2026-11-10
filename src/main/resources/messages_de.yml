@@ -11,6 +11,7 @@ board:
   tile: '&l%value%'
   undo: '&#f9f6f2&lZurück'
   restart: '&#f9f6f2&lNeustart'
+  menu: '&#f9f6f2&lMenü'
   leave: '&#f9f6f2&lBeenden'
   zoom-in: '&#f9f6f2&l+'
   zoom-out: '&#f9f6f2&l-'
@@ -19,3 +20,11 @@ board:
   over: '&#776e65&lSpiel vorbei!'
   keep-going: '&#f9f6f2&lWeiter'
   try-again: '&#f9f6f2&lNochmal'
+
+menu:
+  subtitle: '&#776e65&lGröße wählen'
+  size: '&#f9f6f2&l%size%x%size%'
+  best: '&#eee4da&lRekord %value%'
+  empty: '&#eee4da&lNoch nicht gespielt'
+  back: '&#f9f6f2&lZurück'
+  hint: '&#f9f6f2Größe anklicken  &#776e65|  &#f9f6f2Schleichen zum Beenden'

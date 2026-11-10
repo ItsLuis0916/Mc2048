@@ -33,6 +33,14 @@ public final class Settings {
 
     public record TileColors(Color background, Color text) {}
 
+    public record Menu(double titleY, double titleHeight, double subtitleY, double subtitleHeight, double cardY, double margin,
+                       double cardGap, double pad, double cell, double cellGap, double nameY, double nameHeight, double previewY,
+                       double bestGap, double bestHeight, Area back, double backHeight) {}
+
+    private static final int MIN_SIZE = 2;
+    private static final int MAX_SIZE = 16;
+    private static final int MAX_MENU_SIZES = 4;
+    private static final int DEFAULT_SIZE = 4;
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.builder()
             .character('&').hexColors().build();
     private static final TextReplacementConfig KEYBINDS = TextReplacementConfig.builder()
@@ -40,7 +48,8 @@ public final class Settings {
             .replacement((match, builder) -> Component.keybind(match.group(1)))
             .build();
 
-    public final int size;
+    public final List<Integer> sizes;
+    public final int referenceSize;
     public final int startTiles;
     public final int winValue;
     public final double fourChance;
@@ -86,7 +95,8 @@ public final class Settings {
     public final Color buttonHover;
     public final Color buttonDisabled;
     public final Area board;
-    public final double gap;
+    private final double gap;
+    public final Menu menu;
     public final Color boardColor;
     public final Color cellColor;
     public final Color overlayWon;
@@ -153,7 +163,9 @@ public final class Settings {
     public Settings(FileConfiguration config, FileConfiguration messages, Map<String, FileConfiguration> languages) {
         this.fallback = new Texts(messages);
         languages.forEach((language, file) -> this.languages.put(language, new Texts(file)));
-        size = config.getInt("game.size");
+        List<Integer> sizes = config.getIntegerList("game.sizes").stream()
+                .filter(size -> size >= MIN_SIZE && size <= MAX_SIZE).distinct().sorted().limit(MAX_MENU_SIZES).toList();
+        this.sizes = sizes.isEmpty() ? List.of(DEFAULT_SIZE) : sizes;
         startTiles = config.getInt("game.start-tiles");
         winValue = config.getInt("game.win-value");
         fourChance = config.getDouble("game.four-chance");
@@ -202,6 +214,7 @@ public final class Settings {
         double boardSize = layout.getDouble("board.size");
         board = new Area(layout.getDouble("board.x"), layout.getDouble("board.y"), boardSize, boardSize);
         gap = layout.getDouble("board.gap");
+        referenceSize = Math.max(1, layout.getInt("board.reference-size"));
         boardColor = color(layout.getString("board.color"));
         cellColor = color(layout.getString("board.cell"));
         overlayWon = color(layout.getString("overlay.won"));
@@ -231,6 +244,14 @@ public final class Settings {
         hintTextHeight = layout.getDouble("hint.text-height");
         backdropSize = layout.getDouble("backdrop.size");
         backdropColor = color(layout.getString("backdrop.color"));
+        ConfigurationSection menuSection = layout.getConfigurationSection("menu");
+        menu = new Menu(menuSection.getDouble("title-y"), menuSection.getDouble("title-height"),
+                menuSection.getDouble("subtitle-y"), menuSection.getDouble("subtitle-height"),
+                menuSection.getDouble("card-y"), menuSection.getDouble("margin"), menuSection.getDouble("card-gap"),
+                menuSection.getDouble("pad"), menuSection.getDouble("cell"), menuSection.getDouble("cell-gap"),
+                menuSection.getDouble("name-y"), menuSection.getDouble("name-height"), menuSection.getDouble("preview-y"),
+                menuSection.getDouble("best-gap"), menuSection.getDouble("best-height"),
+                area(menuSection.getConfigurationSection("back")), menuSection.getDouble("back.text-height"));
         zoomIn = area(layout.getConfigurationSection("zoom-in"));
         zoomOut = area(layout.getConfigurationSection("zoom-out"));
         zoomTextHeight = layout.getDouble("zoom-in.text-height");
@@ -267,8 +288,16 @@ public final class Settings {
         mergePitchMax = (float) config.getDouble("sounds.merge-pitch-max");
     }
 
-    public double cellSize() {
-        return (board.width() - gap * (size + 1)) / size;
+    public double gap(int size) {
+        return gap * referenceSize / size;
+    }
+
+    public double cellSize(int size) {
+        return (board.width() - gap(size) * (size + 1)) / size;
+    }
+
+    public double scale(int size) {
+        return cellSize(size) / cellSize(referenceSize);
     }
 
     public double tileTextHeight(int value) {
