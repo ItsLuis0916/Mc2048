@@ -21,6 +21,18 @@ board:
   keep-going: '&#f9f6f2&lWeiter'
   try-again: '&#f9f6f2&lNochmal'
 
+settings:
+  title: '&#776e65&lEinstellungen'
+  sound: '&#776e65&lTon'
+  volume: '&#776e65&lLautstärke'
+  confetti: '&#776e65&lKonfetti'
+  glow: '&#776e65&lGlühen'
+  animations: '&#776e65&lAnimationen'
+  enabled: '&#f9f6f2&lAn'
+  disabled: '&#776e65&lAus'
+  value: '&#776e65&l%value%%'
+  hint: '&#f9f6f2Zum Ändern anklicken  &#776e65|  &#f9f6f2Schleichen zum Beenden'
+
 menu:
   subtitle: '&#776e65&lGröße wählen'
   size: '&#f9f6f2&l%size%x%size%'

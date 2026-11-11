@@ -33,6 +33,9 @@ public final class Settings {
 
     public record TileColors(Color background, Color text) {}
 
+    public record Options(double titleY, double titleHeight, double rowY, double rowGap, double rowHeight, double labelX,
+                          double labelHeight, double controlX, double controlWidth, double stepWidth, double textHeight) {}
+
     public record Menu(double titleY, double titleHeight, double subtitleY, double subtitleHeight, double cardY, double margin,
                        double cardGap, double pad, double cell, double cellGap, double nameY, double nameHeight, double previewY,
                        double bestGap, double bestHeight, Area back, double backHeight) {}
@@ -97,6 +100,11 @@ public final class Settings {
     public final Area board;
     private final double gap;
     public final Menu menu;
+    public final Options options;
+    public final Area settingsButton;
+    public final Color settingsButtonColor;
+    public final Prefs defaults;
+    public final int volumeStep;
     public final Color boardColor;
     public final Color cellColor;
     public final Color overlayWon;
@@ -252,6 +260,17 @@ public final class Settings {
                 menuSection.getDouble("name-y"), menuSection.getDouble("name-height"), menuSection.getDouble("preview-y"),
                 menuSection.getDouble("best-gap"), menuSection.getDouble("best-height"),
                 area(menuSection.getConfigurationSection("back")), menuSection.getDouble("back.text-height"));
+        ConfigurationSection prefs = layout.getConfigurationSection("prefs");
+        options = new Options(prefs.getDouble("title-y"), prefs.getDouble("title-height"), prefs.getDouble("row-y"),
+                prefs.getDouble("row-gap"), prefs.getDouble("row-height"), prefs.getDouble("label-x"),
+                prefs.getDouble("label-height"), prefs.getDouble("control-x"), prefs.getDouble("control-width"),
+                prefs.getDouble("step-width"), prefs.getDouble("text-height"));
+        settingsButton = area(layout.getConfigurationSection("settings-button"));
+        settingsButtonColor = color(layout.getString("settings-button.color"));
+        ConfigurationSection player = config.getConfigurationSection("player-defaults");
+        defaults = new Prefs(player.getBoolean("sound"), player.getInt("volume"), player.getBoolean("confetti"),
+                player.getBoolean("glow"), player.getBoolean("animations"));
+        volumeStep = Math.max(1, player.getInt("volume-step"));
         zoomIn = area(layout.getConfigurationSection("zoom-in"));
         zoomOut = area(layout.getConfigurationSection("zoom-out"));
         zoomTextHeight = layout.getDouble("zoom-in.text-height");

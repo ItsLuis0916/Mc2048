@@ -53,9 +53,13 @@ final class Session {
     private double pointerY = Double.NaN;
     private boolean closed;
     private boolean loading;
+    private boolean settingsOpen;
+    private boolean prefsDirty;
+    private final Prefs prefs;
     private View.Overlay shownOverlay = View.Overlay.NONE;
 
-    Session(Mc2048 plugin, Settings settings, Player player, double zoom) {
+    Session(Mc2048 plugin, Settings settings, Player player, double zoom, Prefs prefs) {
+        this.prefs = prefs;
         this.plugin = plugin;
         this.settings = settings;
         this.zoom = clampZoom(zoom);
@@ -80,7 +84,7 @@ final class Session {
         front.setYaw(yaw + 180);
         faces = List.of(front, back);
         if (first == null) swap(menuView());
-        else show(first);
+        else show(first, false);
         ear = lens.clone();
         camera = world.spawn(lens, ArmorStand.class, stand -> {
             stand.setPersistent(false);
@@ -123,6 +127,7 @@ final class Session {
         if (task != null) task.cancel();
         plugin.ended(player.getUniqueId(), this);
         if (game != null) plugin.store().save(player.getUniqueId(), game, zoom);
+        saveSettings();
         client.detach();
         if (camera != null) View.kill(plugin, camera);
         if (seat != null) {
@@ -153,7 +158,7 @@ final class Session {
             close(true);
             return;
         }
-        if (game == null) return;
+        if (game == null || settingsOpen) return;
         if (next.isForward() && !previous.isForward()) move(Game.Direction.UP);
         if (next.isBackward() && !previous.isBackward()) move(Game.Direction.DOWN);
         if (next.isLeft() && !previous.isLeft()) move(Game.Direction.LEFT);
@@ -168,6 +173,18 @@ final class Session {
         switch (action) {
             case PICK -> {
                 pick(click.size());
+                return;
+            }
+            case SETTINGS -> {
+                openSettings();
+                return;
+            }
+            case BACK -> {
+                closeSettings();
+                return;
+            }
+            case SOUND, VOLUME_DOWN, VOLUME_UP, CONFETTI, GLOW, MOTION -> {
+                change(action);
                 return;
             }
             case MENU -> {
@@ -204,13 +221,13 @@ final class Session {
         loading = true;
         plugin.game(player.getUniqueId(), size).thenAccept(next -> player.getScheduler().run(plugin, task -> {
             loading = false;
-            if (!closed) show(next);
+            if (!closed) show(next, false);
         }, () -> loading = false));
     }
 
-    private void show(Game next) {
+    private void show(Game next, boolean resumed) {
         game = next;
-        shownOverlay = View.Overlay.NONE;
+        shownOverlay = resumed ? overlayOf(next) : View.Overlay.NONE;
         View board = newView();
         board.build(game);
         swap(board);
@@ -224,6 +241,43 @@ final class Session {
         swap(menuView());
     }
 
+    private void openSettings() {
+        settingsOpen = true;
+        View page = newView();
+        page.buildSettings();
+        swap(page);
+        page.options();
+    }
+
+    private void closeSettings() {
+        settingsOpen = false;
+        saveSettings();
+        if (game != null) show(game, true);
+        else swap(menuView());
+    }
+
+    private void change(View.Action action) {
+        switch (action) {
+            case SOUND -> prefs.sound = !prefs.sound;
+            case VOLUME_DOWN -> prefs.volume = Math.max(0, prefs.volume - settings.volumeStep);
+            case VOLUME_UP -> prefs.volume = Math.min(100, prefs.volume + settings.volumeStep);
+            case CONFETTI -> prefs.confetti = !prefs.confetti;
+            case GLOW -> prefs.glow = !prefs.glow;
+            case MOTION -> prefs.animations = !prefs.animations;
+            default -> {
+                return;
+            }
+        }
+        prefsDirty = true;
+        view.options();
+    }
+
+    private void saveSettings() {
+        if (!prefsDirty) return;
+        prefsDirty = false;
+        plugin.store().saveSettings(player.getUniqueId(), prefs);
+    }
+
     private View menuView() {
         View menu = newView();
         menu.buildMenu(settings.sizes, slots);
@@ -231,7 +285,7 @@ final class Session {
     }
 
     private View newView() {
-        return new View(plugin, player, settings, texts, faces, zoom);
+        return new View(plugin, player, settings, prefs, texts, faces, zoom);
     }
 
     private void swap(View next) {
@@ -253,23 +307,28 @@ final class Session {
         boolean reached = shownOverlay != View.Overlay.WON && game.showWin();
         view.render(turn);
         refresh(turn.gained());
-        if (reached) view.confetti();
+        if (reached && prefs.confetti) view.confetti();
     }
 
     private void refresh(int gained) {
         plugin.store().remember(player.getUniqueId(), game);
         view.score(game.score(), game.best(), gained);
         view.undoEnabled(game.canUndo());
-        View.Overlay overlay = game.showWin() ? View.Overlay.WON : game.over() ? View.Overlay.OVER : View.Overlay.NONE;
+        View.Overlay overlay = overlayOf(game);
         view.overlay(overlay, game.canUndo());
         if (overlay != shownOverlay && overlay != View.Overlay.NONE) play(overlay == View.Overlay.WON ? "won" : "over", 0);
         shownOverlay = overlay;
     }
 
+    private static View.Overlay overlayOf(Game game) {
+        return game.showWin() ? View.Overlay.WON : game.over() ? View.Overlay.OVER : View.Overlay.NONE;
+    }
+
     private void play(String event, float pitchShift) {
-        if (ear == null) return;
+        if (ear == null || !prefs.sound || prefs.volume == 0) return;
+        float volume = prefs.volume / 100f;
         for (Sound sound : settings.sounds(event)) {
-            player.playSound(Sound.sound(sound).pitch(sound.pitch() + pitchShift).build(), ear.getX(), ear.getY(), ear.getZ());
+            player.playSound(Sound.sound(sound).pitch(sound.pitch() + pitchShift).volume(sound.volume() * volume).build(), ear.getX(), ear.getY(), ear.getZ());
         }
     }
 

@@ -5,6 +5,14 @@ game:
   four-chance: 0.1
   undo-cooldown: 2
 
+player-defaults:
+  sound: true
+  volume: 100
+  volume-step: 10
+  confetti: true
+  glow: true
+  animations: true
+
 camera:
   distance: 3.2
   lens-offset: 0.5
@@ -104,6 +112,24 @@ layout:
     y: 140
     width: 130
     height: 40
+    text-height: 13
+  settings-button:
+    x: 506
+    y: 16
+    width: 36
+    height: 36
+    color: '#f9f6f2'
+  prefs:
+    title-y: 100
+    title-height: 40
+    row-y: 190
+    row-gap: 80
+    row-height: 46
+    label-x: 160
+    label-height: 14
+    control-x: 300
+    control-width: 200
+    step-width: 46
     text-height: 13
   menu:
     title-y: 110

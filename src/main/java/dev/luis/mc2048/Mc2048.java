@@ -128,12 +128,12 @@ public final class Mc2048 extends JavaPlugin implements Listener {
         if (!opening.add(uuid)) return;
         boolean menu = settings.sizes.size() > 1;
         CompletableFuture<Game> first = menu ? CompletableFuture.completedFuture(null) : game(uuid, settings.sizes.getFirst());
-        store.profile(uuid, settings.zoomDefault).exceptionally(error -> new Store.Profile(settings.zoomDefault, Map.of()))
+        store.profile(uuid, settings.zoomDefault, settings.defaults).exceptionally(error -> new Store.Profile(settings.zoomDefault, Map.of(), settings.defaults.copy()))
                 .thenCombine(first, (profile, game) -> {
                     player.getScheduler().run(this, task -> {
                         opening.remove(uuid);
                         if (!player.isOnline() || sessions.containsKey(uuid)) return;
-                        Session session = new Session(this, settings, player, profile.zoom());
+                        Session session = new Session(this, settings, player, profile.zoom(), profile.prefs());
                         sessions.put(uuid, session);
                         if (!session.open(profile.slots(), game)) sessions.remove(uuid, session);
                     }, () -> opening.remove(uuid));

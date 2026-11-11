@@ -21,6 +21,18 @@ board:
   keep-going: '&#f9f6f2&lKeep going'
   try-again: '&#f9f6f2&lTry again'
 
+settings:
+  title: '&#776e65&lSettings'
+  sound: '&#776e65&lSound'
+  volume: '&#776e65&lVolume'
+  confetti: '&#776e65&lConfetti'
+  glow: '&#776e65&lGlow'
+  animations: '&#776e65&lAnimations'
+  enabled: '&#f9f6f2&lOn'
+  disabled: '&#776e65&lOff'
+  value: '&#776e65&l%value%%'
+  hint: '&#f9f6f2Click to change  &#776e65|  &#f9f6f2Sneak to leave'
+
 menu:
   subtitle: '&#776e65&lChoose a size'
   size: '&#f9f6f2&l%size%x%size%'

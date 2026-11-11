@@ -16,6 +16,7 @@ Type `/2048` and the screen goes black, a menu lets you pick 4x4, 6x6 or 8x8, th
 - Board sizes 4x4, 6x6 and 8x8 from a menu, the sizes are set in `config.yml` (`game.sizes`)
 - Game and best score are saved per player and per size, picking a size continues where you left off
 - Board size per player with the + and - buttons, so it fits any FOV
+- Settings page behind the three lines in the corner of the size menu: sound and volume, confetti, glow and animations, saved per player. The defaults are in `config.yml` under `player-defaults`
 - No crosshair, hotbar or hearts while playing, only the board on black
 - Short note block sounds for moves, merges, buttons, win and game over, all set in `config.yml`
 - English and German built in, the language follows the player's client. Drop a `messages_<language>.yml` into the plugin folder to add more

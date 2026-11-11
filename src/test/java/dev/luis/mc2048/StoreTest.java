@@ -37,10 +37,29 @@ class StoreTest {
         assertEquals(36, loaded.cells().length);
         assertTrue(reopened.load(uuid, game(4)).get());
         assertFalse(reopened.load(uuid, game(8)).get());
-        Store.Profile profile = reopened.profile(uuid, 2).get();
+        Store.Profile profile = reopened.profile(uuid, 2, new Prefs(true, 100, true, true, true)).get();
         assertEquals(1.2, profile.zoom());
         assertEquals(java.util.Set.of(4, 6), profile.slots().keySet());
         reopened.close();
+    }
+
+    @Test
+    void keepsPlayerSettings(@TempDir Path folder) throws Exception {
+        UUID uuid = UUID.randomUUID();
+        Prefs defaults = new Prefs(true, 100, true, true, true);
+        Store store = new Store(folder.toFile());
+        assertEquals(100, store.profile(uuid, 1.5, defaults).get().prefs().volume);
+        store.saveSettings(uuid, new Prefs(false, 40, false, true, false));
+        Game game = game(4);
+        game.restart(2);
+        store.save(uuid, game, 1.5);
+        Prefs saved = store.profile(uuid, 1.5, defaults).get().prefs();
+        assertFalse(saved.sound);
+        assertEquals(40, saved.volume);
+        assertFalse(saved.confetti);
+        assertTrue(saved.glow);
+        assertFalse(saved.animations);
+        store.close();
     }
 
     @Test
@@ -63,7 +82,7 @@ class StoreTest {
         assertTrue(store.load(uuid, loaded).get());
         assertEquals(40, loaded.score());
         assertEquals(120, loaded.best());
-        assertEquals(120, store.profile(uuid, 2).get().slots().get(4).best());
+        assertEquals(120, store.profile(uuid, 2, new Prefs(true, 100, true, true, true)).get().slots().get(4).best());
         store.close();
     }
 }

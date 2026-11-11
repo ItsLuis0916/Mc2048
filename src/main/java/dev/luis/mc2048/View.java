@@ -26,7 +26,7 @@ import java.util.function.Supplier;
 
 final class View {
 
-    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE, MENU, PICK, ZOOM_IN, ZOOM_OUT }
+    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE, MENU, PICK, SETTINGS, BACK, SOUND, VOLUME_DOWN, VOLUME_UP, CONFETTI, GLOW, MOTION, ZOOM_IN, ZOOM_OUT }
 
     record Click(Action action, int size) {}
 
@@ -44,6 +44,9 @@ final class View {
     private static final byte FADED = 4;
     private static final int LINE_WIDTH = 1000;
     private static final Color CLEAR = Color.fromARGB(0);
+    private static final int BARS = 3;
+    private static final double BAR_WIDTH = 0.56;
+    private static final double BAR_THICKNESS = 0.11;
     private static final Display.Brightness FULL_BRIGHT = new Display.Brightness(15, 15);
 
     private static final int BACKDROP = -1;
@@ -103,6 +106,7 @@ final class View {
         private final int size;
         private boolean enabled = true;
         private boolean hovered;
+        private boolean dim;
 
         private Button(Settings.Area area, Action action, String text, double textHeight, int layer) {
             this(area, action, texts.text(text), textHeight, area.height() / 2, layer, 0);
@@ -117,7 +121,7 @@ final class View {
         }
 
         private void paint() {
-            Color color = !enabled ? settings.buttonDisabled : hovered ? settings.buttonHover : settings.buttonColor;
+            Color color = !enabled ? settings.buttonDisabled : hovered ? settings.buttonHover : dim ? settings.buttonDisabled : settings.buttonColor;
             background.set(d -> d.setBackgroundColor(color));
         }
     }
@@ -125,12 +129,15 @@ final class View {
     private final Plugin plugin;
     private final Player player;
     private final Settings settings;
+    private final Prefs prefs;
     private final Settings.Texts texts;
     private final List<Location> faces;
     private final List<Part> parts = new ArrayList<>();
     private final Map<Integer, Tile> tiles = new HashMap<>();
     private final List<Button> buttons = new ArrayList<>();
     private final List<Button> overlayButtons = new ArrayList<>();
+    private final Map<Action, Button> toggles = new HashMap<>();
+    private Part volumeValue;
     private final List<Part> overlayParts = new ArrayList<>();
     private final List<Pending> pending = new ArrayList<>();
     private Button undo;
@@ -150,7 +157,8 @@ final class View {
     private double pointerX;
     private double pointerY;
 
-    View(Plugin plugin, Player player, Settings settings, Settings.Texts texts, List<Location> faces, double zoom) {
+    View(Plugin plugin, Player player, Settings settings, Prefs prefs, Settings.Texts texts, List<Location> faces, double zoom) {
+        this.prefs = prefs;
         this.texts = texts;
         this.zoom = zoom;
         this.plugin = plugin;
@@ -171,6 +179,7 @@ final class View {
         buttons.add(new Button(settings.restart, Action.RESTART, "board.restart", settings.restartTextHeight, PANEL));
         boolean menu = settings.sizes.size() > 1;
         buttons.add(new Button(settings.leave, menu ? Action.MENU : Action.LEAVE, menu ? "board.menu" : "board.leave", settings.leaveTextHeight, PANEL));
+        if (!menu) settingsButton();
         buttons.add(new Button(settings.zoomOut, Action.ZOOM_OUT, "board.zoom-out", settings.zoomTextHeight, PANEL));
         buttons.add(new Button(settings.zoomIn, Action.ZOOM_IN, "board.zoom-in", settings.zoomTextHeight, PANEL));
         rect(settings.board, PANEL, settings.boardColor);
@@ -195,14 +204,83 @@ final class View {
             Settings.Area area = new Settings.Area(x, menu.cardY(), cardWidth(size, cell), height);
             buttons.add(new Button(area, Action.PICK, texts.text("menu.size", "%size%", size), menu.nameHeight(), menu.nameY(), PANEL, size));
             Store.Slot slot = slots.get(size);
-            miniBoard(area.x() + menu.pad(), area.y() + menu.previewY(), size, cell, slot == null ? new int[0] : slot.cells());
+            miniBoard(area.x() + menu.pad(), area.y() + menu.previewY() + (zone - previewSpan(size, cell)) / 2, size, cell, slot == null ? new int[0] : slot.cells());
             int best = slot == null ? 0 : slot.best();
             label(area.centerX(), area.y() + menu.previewY() + zone + menu.bestGap(), menu.bestHeight(), PANEL + 1,
                     best == 0 ? texts.text("menu.empty") : texts.text("menu.best", "%value%", best));
             x += area.width() + menu.cardGap();
         }
         buttons.add(new Button(menu.back(), Action.LEAVE, "menu.back", menu.backHeight(), PANEL));
+        settingsButton();
         cursor();
+    }
+
+    void buildSettings() {
+        Settings.Options options = settings.options;
+        page("settings.hint");
+        label(settings.pageWidth / 2, options.titleY(), options.titleHeight(), PANEL, texts.text("settings.title"));
+        double y = options.rowY();
+        for (String key : List.of("settings.sound", "settings.volume", "settings.confetti", "settings.glow", "settings.animations")) {
+            label(options.labelX(), y + options.rowHeight() / 2, options.labelHeight(), PANEL, texts.text(key));
+            switch (key) {
+                case "settings.volume" -> {
+                    double x = options.controlX();
+                    control(Action.VOLUME_DOWN, texts.text("board.zoom-out"), x, y, options.stepWidth());
+                    control(Action.VOLUME_UP, texts.text("board.zoom-in"), x + options.controlWidth() - options.stepWidth(), y, options.stepWidth());
+                    volumeValue = label(x + options.controlWidth() / 2, y + options.rowHeight() / 2, options.textHeight(), PANEL + 1, Component.empty());
+                }
+                case "settings.sound" -> toggles.put(Action.SOUND, control(Action.SOUND, Component.empty(), options.controlX(), y, options.controlWidth()));
+                case "settings.confetti" -> toggles.put(Action.CONFETTI, control(Action.CONFETTI, Component.empty(), options.controlX(), y, options.controlWidth()));
+                case "settings.glow" -> toggles.put(Action.GLOW, control(Action.GLOW, Component.empty(), options.controlX(), y, options.controlWidth()));
+                default -> toggles.put(Action.MOTION, control(Action.MOTION, Component.empty(), options.controlX(), y, options.controlWidth()));
+            }
+            y += options.rowGap();
+        }
+        buttons.add(new Button(settings.menu.back(), Action.BACK, "menu.back", settings.menu.backHeight(), PANEL));
+        cursor();
+    }
+
+    void options() {
+        toggle(Action.SOUND, prefs.sound);
+        toggle(Action.CONFETTI, prefs.confetti);
+        toggle(Action.GLOW, prefs.glow);
+        toggle(Action.MOTION, prefs.animations);
+        Component value = texts.text("settings.value", "%value%", prefs.volume);
+        volumeValue.set(d -> d.text(value));
+    }
+
+    private void toggle(Action action, boolean on) {
+        Button button = toggles.get(action);
+        Component text = texts.text(on ? "settings.enabled" : "settings.disabled");
+        button.label.set(d -> d.text(text));
+        button.dim = !on;
+        button.paint();
+    }
+
+    private Button control(Action action, Component text, double x, double y, double width) {
+        Button button = new Button(new Settings.Area(x, y, width, settings.options.rowHeight()), action, text,
+                settings.options.textHeight(), settings.options.rowHeight() / 2, PANEL, 0);
+        buttons.add(button);
+        return button;
+    }
+
+    private void settingsButton() {
+        Settings.Area area = settings.settingsButton;
+        buttons.add(new Button(area, Action.SETTINGS, Component.empty(), 1, area.height() / 2, PANEL, 0));
+        double width = area.width() * BAR_WIDTH;
+        double thickness = area.height() * BAR_THICKNESS;
+        double top = area.centerY() - thickness * (BARS * 2 - 1) / 2;
+        for (int bar = 0; bar < BARS; bar++) {
+            rect(new Settings.Area(area.centerX() - width / 2, top + bar * thickness * 2, width, thickness), PANEL + 1, settings.settingsButtonColor);
+        }
+    }
+
+    private int ticks(int value) {
+        return prefs.animations ? value : 0;
+    }
+
+    private float pop() {
+        return prefs.animations ? settings.popScale : 1;
     }
 
     private double previewSpan(int size, double cell) {
@@ -290,9 +368,9 @@ final class View {
         flush();
         for (Game.Slide slide : turn.slides()) {
             Tile tile = tiles.get(slide.id());
-            if (tile != null) place(tile, slide.to(), 1, settings.slideTicks);
+            if (tile != null) place(tile, slide.to(), 1, ticks(settings.slideTicks));
         }
-        later(settings.slideTicks + settings.settleTicks, () -> {
+        later(ticks(settings.slideTicks + settings.settleTicks), () -> {
             for (Game.Merge merge : turn.merges()) {
                 Tile second = tiles.remove(merge.second());
                 if (second != null) removeTile(second);
@@ -300,8 +378,8 @@ final class View {
                 if (first == null) continue;
                 tiles.put(merge.id(), first);
                 paint(first, merge.value());
-                place(first, merge.at(), settings.popScale, settings.popTicks);
-                later(settings.popTicks, () -> place(first, merge.at(), 1, settings.popTicks));
+                place(first, merge.at(), pop(), ticks(settings.popTicks));
+                later(ticks(settings.popTicks), () -> place(first, merge.at(), 1, ticks(settings.popTicks)));
             }
             if (turn.spawn() != null) appear(turn.spawn().id(), turn.spawn().value(), turn.spawn().at());
         });
@@ -318,7 +396,7 @@ final class View {
             Component text = texts.text("board.value", "%value%", best);
             bestValue.set(d -> d.text(text));
         }
-        if (gained <= 0) return;
+        if (gained <= 0 || !prefs.animations) return;
         Settings.Area area = settings.score.area();
         double x = area.centerX();
         double y = area.y() + settings.score.valueY();
@@ -474,14 +552,14 @@ final class View {
     private void appear(int id, int value, int cell) {
         Tile tile = tile(value, cell, HIDDEN);
         tiles.put(id, tile);
-        later(1, () -> place(tile, cell, 1, settings.appearTicks));
+        later(1, () -> place(tile, cell, 1, ticks(settings.appearTicks)));
     }
 
     private Tile tile(int value, int cell, float scale) {
         Settings.TileColors colors = settings.tileColors(value);
         double size = settings.cellSize(side);
         double height = settings.tileTextHeight(value) * fit;
-        Part glow = value < settings.glowFrom ? null : glow(value, cell, scale);
+        Part glow = value < settings.glowFrom || !prefs.glow ? null : glow(value, cell, scale);
         Part background = spawn(d -> {
             d.text(Component.text(BLOCK));
             d.setBackgroundColor(colors.background());
@@ -542,7 +620,7 @@ final class View {
         double size = settings.cellSize(side);
         double height = settings.tileTextHeight(tile.value) * fit;
         double halo = size + settings.glowMargin * fit * 2;
-        if (tile.glow == null && tile.value >= settings.glowFrom) tile.glow = glow(tile.value, cell, 1);
+        if (tile.glow == null && tile.value >= settings.glowFrom && prefs.glow) tile.glow = glow(tile.value, cell, 1);
         if (tile.glow != null) {
             tile.glow.animate(ticks, d -> d.setTransformation(rectTransform(cellX(cell), cellY(cell), halo, halo, GLOW, scale)));
             tile.glow.layout = () -> rectTransform(cellX(cell), cellY(cell), halo, halo, GLOW, 1);

@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 public final class Store {
 
@@ -27,6 +28,7 @@ public final class Store {
 
     private static final Record EMPTY = new Record(0, 0, 0);
     private static final String SIZES = "sizes";
+    private static final String SETTINGS = "settings";
     private static final List<String> LEGACY_KEYS = List.of("cells", "score", "best", "won", "keep-playing", "undo.cells", "undo.score", "undo.lock");
 
     private final File folder;
@@ -40,16 +42,16 @@ public final class Store {
 
     public record Slot(int best, int[] cells) {}
 
-    public record Profile(double zoom, Map<Integer, Slot> slots) {}
+    public record Profile(double zoom, Map<Integer, Slot> slots, Prefs prefs) {}
 
-    public CompletableFuture<Profile> profile(UUID uuid, double defaultZoom) {
+    public CompletableFuture<Profile> profile(UUID uuid, double defaultZoom, Prefs defaults) {
         return CompletableFuture.supplyAsync(() -> {
             File file = file(uuid);
-            if (!file.isFile()) return new Profile(defaultZoom, Map.of());
+            if (!file.isFile()) return new Profile(defaultZoom, Map.of(), defaults.copy());
             YamlConfiguration yaml = read(file);
             Map<Integer, Slot> slots = new HashMap<>();
             sections(yaml).forEach((size, section) -> slots.put(size, new Slot(section.getInt("best"), ints(section.getIntegerList("cells")))));
-            return new Profile(yaml.getDouble("zoom", defaultZoom), slots);
+            return new Profile(yaml.getDouble("zoom", defaultZoom), slots, Prefs.read(yaml.getConfigurationSection(SETTINGS), defaults));
         }, io);
     }
 
@@ -84,13 +86,24 @@ public final class Store {
         undo.put("lock", game.undoLock());
         data.put("undo", undo);
         int size = game.size();
+        update(uuid, yaml -> {
+            yaml.set("zoom", zoom);
+            yaml.set("last", size);
+            yaml.createSection(SIZES + "." + size, data);
+        });
+    }
+
+    public void saveSettings(UUID uuid, Prefs prefs) {
+        Map<String, Object> data = prefs.toMap();
+        update(uuid, yaml -> yaml.createSection(SETTINGS, data));
+    }
+
+    private void update(UUID uuid, Consumer<YamlConfiguration> change) {
         io.execute(() -> {
             try {
                 File file = file(uuid);
                 YamlConfiguration yaml = file.isFile() ? read(file) : new YamlConfiguration();
-                yaml.set("zoom", zoom);
-                yaml.set("last", size);
-                yaml.createSection(SIZES + "." + size, data);
+                change.accept(yaml);
                 file.getParentFile().mkdirs();
                 File temp = new File(file.getParentFile(), file.getName() + ".tmp");
                 Files.writeString(temp.toPath(), yaml.saveToString());
