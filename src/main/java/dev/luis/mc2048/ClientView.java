@@ -4,11 +4,17 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import net.minecraft.network.protocol.BundlerInfo;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundBundlePacket;
 import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
 import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
 import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
+import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
 import net.minecraft.network.protocol.game.ClientboundSetCameraPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetPlayerInventoryPacket;
@@ -18,12 +24,15 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.phys.Vec3;
 import org.bukkit.craftbukkit.entity.CraftEntity;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 final class ClientView extends ChannelOutboundHandlerAdapter {
 
@@ -39,10 +48,49 @@ final class ClientView extends ChannelOutboundHandlerAdapter {
 
     private final ServerPlayer player;
     private final Channel channel;
+    private final Set<Entity> live = new LinkedHashSet<>();
+    private final Set<Entity> added = new LinkedHashSet<>();
+    private final IntArrayList removed = new IntArrayList();
 
     ClientView(Player player) {
         this.player = ((CraftPlayer) player).getHandle();
         this.channel = this.player.connection.connection.channel;
+    }
+
+    void spawn(org.bukkit.entity.Entity entity) {
+        Entity handle = ((CraftEntity) entity).getHandle();
+        live.add(handle);
+        added.add(handle);
+    }
+
+    void remove(org.bukkit.entity.Entity entity) {
+        Entity handle = ((CraftEntity) entity).getHandle();
+        if (live.remove(handle) && !added.remove(handle)) removed.add(handle.getId());
+    }
+
+    void commit() {
+        List<Packet<? super ClientGamePacketListener>> packets = new ArrayList<>();
+        if (!removed.isEmpty()) packets.add(new ClientboundRemoveEntitiesPacket(removed.toIntArray()));
+        removed.clear();
+        for (Entity entity : added) {
+            packets.add(new ClientboundAddEntityPacket(entity.getId(), entity.getUUID(), entity.getX(), entity.getY(), entity.getZ(),
+                    entity.getXRot(), entity.getYRot(), entity.getType(), 0, Vec3.ZERO, entity.getYRot()));
+            List<SynchedEntityData.DataValue<?>> data = entity.getEntityData().getNonDefaultValues();
+            entity.getEntityData().packDirty();
+            if (data != null) packets.add(new ClientboundSetEntityDataPacket(entity.getId(), data));
+        }
+        added.clear();
+        for (Entity entity : live) {
+            if (entity.getEntityData().isDirty()) packets.add(new ClientboundSetEntityDataPacket(entity.getId(), entity.getEntityData().packDirty()));
+        }
+        if (packets.isEmpty() || !channel.isOpen()) return;
+        if (packets.size() == 1) {
+            player.connection.send(packets.getFirst());
+            return;
+        }
+        for (int from = 0; from < packets.size(); from += BundlerInfo.BUNDLE_SIZE_LIMIT) {
+            player.connection.send(new ClientboundBundlePacket(List.copyOf(packets.subList(from, Math.min(packets.size(), from + BundlerInfo.BUNDLE_SIZE_LIMIT)))));
+        }
     }
 
     static void keepFeet(org.bukkit.entity.Entity seat, Player rider) {

@@ -7,7 +7,6 @@ import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.util.Transformation;
@@ -82,7 +81,7 @@ final class View {
 
         private void remove() {
             parts.remove(this);
-            displays.forEach(display -> kill(plugin, display));
+            displays.forEach(client::remove);
         }
     }
 
@@ -126,8 +125,7 @@ final class View {
         }
     }
 
-    private final Plugin plugin;
-    private final Player player;
+    private final ClientView client;
     private final Settings settings;
     private final Prefs prefs;
     private final Settings.Texts texts;
@@ -157,12 +155,11 @@ final class View {
     private double pointerX;
     private double pointerY;
 
-    View(Plugin plugin, Player player, Settings settings, Prefs prefs, Settings.Texts texts, List<Location> faces, double zoom) {
+    View(ClientView client, Settings settings, Prefs prefs, Settings.Texts texts, List<Location> faces, double zoom) {
         this.prefs = prefs;
         this.texts = texts;
         this.zoom = zoom;
-        this.plugin = plugin;
-        this.player = player;
+        this.client = client;
         this.settings = settings;
         this.faces = faces;
     }
@@ -472,6 +469,10 @@ final class View {
         movePointer(x, y, settings.cursorTicks);
     }
 
+    void cursorAt(double x, double y) {
+        movePointer(x, y, 0);
+    }
+
     private void movePointer(double x, double y, int ticks) {
         pointerX = x;
         pointerY = y;
@@ -707,17 +708,14 @@ final class View {
         part.layout = layout;
         Transformation start = layout.get();
         for (Location face : faces) {
-            TextDisplay display = face.getWorld().spawn(face, TextDisplay.class, d -> {
-                d.setPersistent(false);
-                d.setVisibleByDefault(false);
-                d.setBrightness(FULL_BRIGHT);
-                d.setShadowed(false);
-                d.setLineWidth(LINE_WIDTH);
-                d.setBackgroundColor(CLEAR);
-                d.setTransformation(start);
-                setup.accept(d);
-            });
-            player.showEntity(plugin, display);
+            TextDisplay display = face.getWorld().createEntity(face, TextDisplay.class);
+            display.setBrightness(FULL_BRIGHT);
+            display.setShadowed(false);
+            display.setLineWidth(LINE_WIDTH);
+            display.setBackgroundColor(CLEAR);
+            display.setTransformation(start);
+            setup.accept(display);
+            client.spawn(display);
             part.displays.add(display);
         }
         parts.add(part);

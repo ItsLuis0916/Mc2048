@@ -49,8 +49,8 @@ final class Session {
     private double zoom;
     private double yawAnchor;
     private double pitchAnchor;
-    private double pointerX = Double.NaN;
-    private double pointerY = Double.NaN;
+    private double pointerX;
+    private double pointerY;
     private boolean closed;
     private boolean loading;
     private boolean settingsOpen;
@@ -67,6 +67,8 @@ final class Session {
         this.client = new ClientView(player);
         this.texts = settings.texts(player.locale());
         this.input = player.getCurrentInput();
+        this.pointerX = settings.pageWidth / 2;
+        this.pointerY = settings.pageHeight / 2;
     }
 
     boolean open(Map<Integer, Store.Slot> saved, Game first) {
@@ -128,6 +130,8 @@ final class Session {
         plugin.ended(player.getUniqueId(), this);
         if (game != null) plugin.store().save(player.getUniqueId(), game, zoom);
         saveSettings();
+        if (view != null) view.remove();
+        client.commit();
         client.detach();
         if (camera != null) View.kill(plugin, camera);
         if (seat != null) {
@@ -140,7 +144,6 @@ final class Session {
             if (notify) player.sendMessage(texts.text("stop"));
             play("close", 0);
         }
-        if (view != null) view.remove();
     }
 
     void refake(Block block) {
@@ -152,6 +155,11 @@ final class Session {
     }
 
     void input(Input next) {
+        steer(next);
+        if (!closed) client.commit();
+    }
+
+    private void steer(Input next) {
         Input previous = input;
         input = next;
         if (next.isSneak() && !previous.isSneak()) {
@@ -166,6 +174,11 @@ final class Session {
     }
 
     void click() {
+        press();
+        if (!closed) client.commit();
+    }
+
+    private void press() {
         View.Click click = view.click();
         if (click == null) return;
         View.Action action = click.action();
@@ -285,14 +298,13 @@ final class Session {
     }
 
     private View newView() {
-        return new View(plugin, player, settings, prefs, texts, faces, zoom);
+        return new View(client, settings, prefs, texts, faces, zoom);
     }
 
     private void swap(View next) {
         if (view != null) view.remove();
         view = next;
-        pointerX = Double.NaN;
-        pointerY = Double.NaN;
+        view.cursorAt(pointerX, pointerY);
     }
 
     private void move(Game.Direction direction) {
@@ -348,6 +360,11 @@ final class Session {
 
     private void tick() {
         view.tick();
+        aim();
+        client.commit();
+    }
+
+    private void aim() {
         float lookYaw = player.getYaw();
         float lookPitch = player.getPitch();
         double unit = settings.unit * zoom;
