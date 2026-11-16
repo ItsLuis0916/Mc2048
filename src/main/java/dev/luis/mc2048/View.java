@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 
 final class View {
 
-    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE, MENU, PICK, SETTINGS, BACK, SOUND, VOLUME_DOWN, VOLUME_UP, CONFETTI, GLOW, MOTION, ZOOM_IN, ZOOM_OUT }
+    enum Action { UNDO, RESTART, KEEP_GOING, LEAVE, MENU, PICK, SETTINGS, BACK, SOUND, VOLUME_DOWN, VOLUME_UP, CONFETTI, GLOW, MOTION, ZOOM_IN, ZOOM_OUT, THEME_PREVIOUS, THEME_NEXT }
 
     record Click(Action action, int size) {}
 
@@ -108,19 +108,19 @@ final class View {
         private boolean dim;
 
         private Button(Settings.Area area, Action action, String text, double textHeight, int layer) {
-            this(area, action, texts.text(text), textHeight, area.height() / 2, layer, 0);
+            this(area, action, text(text), textHeight, area.height() / 2, layer, 0);
         }
 
         private Button(Settings.Area area, Action action, Component text, double textHeight, double textY, int layer, int size) {
             this.area = area;
             this.action = action;
             this.size = size;
-            this.background = rect(area, layer, settings.buttonColor);
+            this.background = rect(area, layer, theme.button());
             this.label = label(area.centerX(), area.y() + textY, textHeight, layer + 1, text);
         }
 
         private void paint() {
-            Color color = !enabled ? settings.buttonDisabled : hovered ? settings.buttonHover : dim ? settings.buttonDisabled : settings.buttonColor;
+            Color color = !enabled ? theme.buttonDisabled() : hovered ? theme.buttonHover() : dim ? theme.buttonDisabled() : theme.button();
             background.set(d -> d.setBackgroundColor(color));
         }
     }
@@ -129,6 +129,7 @@ final class View {
     private final Settings settings;
     private final Prefs prefs;
     private final Settings.Texts texts;
+    private final Settings.Theme theme;
     private final List<Location> faces;
     private final List<Part> parts = new ArrayList<>();
     private final Map<Integer, Tile> tiles = new HashMap<>();
@@ -136,6 +137,7 @@ final class View {
     private final List<Button> overlayButtons = new ArrayList<>();
     private final Map<Action, Button> toggles = new HashMap<>();
     private Part volumeValue;
+    private Part themeValue;
     private final List<Part> overlayParts = new ArrayList<>();
     private final List<Pending> pending = new ArrayList<>();
     private Button undo;
@@ -158,6 +160,7 @@ final class View {
     View(ClientView client, Settings settings, Prefs prefs, Settings.Texts texts, List<Location> faces, double zoom) {
         this.prefs = prefs;
         this.texts = texts;
+        this.theme = settings.theme(prefs.theme);
         this.zoom = zoom;
         this.client = client;
         this.settings = settings;
@@ -168,7 +171,7 @@ final class View {
         side = game.size();
         fit = settings.scale(side);
         page("board.hint");
-        label(settings.title.centerX(), settings.title.centerY(), settings.titleHeight, PANEL, texts.text("board.title"));
+        label(settings.title.centerX(), settings.title.centerY(), settings.titleHeight, PANEL, text("board.title"));
         scoreValue = scoreBox(settings.score, "board.score");
         bestValue = scoreBox(settings.best, "board.best");
         undo = new Button(settings.undo, Action.UNDO, "board.undo", settings.undoTextHeight, PANEL);
@@ -179,10 +182,10 @@ final class View {
         if (!menu) settingsButton();
         buttons.add(new Button(settings.zoomOut, Action.ZOOM_OUT, "board.zoom-out", settings.zoomTextHeight, PANEL));
         buttons.add(new Button(settings.zoomIn, Action.ZOOM_IN, "board.zoom-in", settings.zoomTextHeight, PANEL));
-        rect(settings.board, PANEL, settings.boardColor);
+        rect(settings.board, PANEL, theme.board());
         double cell = settings.cellSize(side);
         for (int i = 0; i < side * side; i++) {
-            rect(new Settings.Area(cellX(i) - cell / 2, cellY(i) - cell / 2, cell, cell), CELL, settings.cellColor);
+            rect(new Settings.Area(cellX(i) - cell / 2, cellY(i) - cell / 2, cell, cell), CELL, theme.cell());
         }
         cursor();
         sync(game, false);
@@ -191,20 +194,20 @@ final class View {
     void buildMenu(List<Integer> sizes, Map<Integer, Store.Slot> slots) {
         Settings.Menu menu = settings.menu;
         page("menu.hint");
-        label(settings.pageWidth / 2, menu.titleY(), menu.titleHeight(), PANEL, texts.text("board.title"));
-        label(settings.pageWidth / 2, menu.subtitleY(), menu.subtitleHeight(), PANEL, texts.text("menu.subtitle"));
+        label(settings.pageWidth / 2, menu.titleY(), menu.titleHeight(), PANEL, text("board.title"));
+        label(settings.pageWidth / 2, menu.subtitleY(), menu.subtitleHeight(), PANEL, text("menu.subtitle"));
         double cell = menuCell(sizes);
         double zone = previewSpan(sizes.stream().mapToInt(Integer::intValue).max().orElse(0), cell);
         double height = menu.previewY() + zone + menu.bestGap() * 2;
         double x = (settings.pageWidth - sizes.stream().mapToDouble(size -> cardWidth(size, cell)).sum() - (sizes.size() - 1) * menu.cardGap()) / 2;
         for (int size : sizes) {
             Settings.Area area = new Settings.Area(x, menu.cardY(), cardWidth(size, cell), height);
-            buttons.add(new Button(area, Action.PICK, texts.text("menu.size", "%size%", size), menu.nameHeight(), menu.nameY(), PANEL, size));
+            buttons.add(new Button(area, Action.PICK, text("menu.size", "%size%", size), menu.nameHeight(), menu.nameY(), PANEL, size));
             Store.Slot slot = slots.get(size);
             miniBoard(area.x() + menu.pad(), area.y() + menu.previewY() + (zone - previewSpan(size, cell)) / 2, size, cell, slot == null ? new int[0] : slot.cells());
             int best = slot == null ? 0 : slot.best();
             label(area.centerX(), area.y() + menu.previewY() + zone + menu.bestGap(), menu.bestHeight(), PANEL + 1,
-                    best == 0 ? texts.text("menu.empty") : texts.text("menu.best", "%value%", best));
+                    best == 0 ? text("menu.empty") : text("menu.best", "%value%", best));
             x += area.width() + menu.cardGap();
         }
         buttons.add(new Button(menu.back(), Action.LEAVE, "menu.back", menu.backHeight(), PANEL));
@@ -215,15 +218,21 @@ final class View {
     void buildSettings() {
         Settings.Options options = settings.options;
         page("settings.hint");
-        label(settings.pageWidth / 2, options.titleY(), options.titleHeight(), PANEL, texts.text("settings.title"));
+        label(settings.pageWidth / 2, options.titleY(), options.titleHeight(), PANEL, text("settings.title"));
         double y = options.rowY();
-        for (String key : List.of("settings.sound", "settings.volume", "settings.confetti", "settings.glow", "settings.animations")) {
-            label(options.labelX(), y + options.rowHeight() / 2, options.labelHeight(), PANEL, texts.text(key));
+        for (String key : List.of("settings.theme", "settings.sound", "settings.volume", "settings.confetti", "settings.glow", "settings.animations")) {
+            label(options.labelX(), y + options.rowHeight() / 2, options.labelHeight(), PANEL, text(key));
             switch (key) {
+                case "settings.theme" -> {
+                    double x = options.controlX();
+                    control(Action.THEME_PREVIOUS, text("settings.previous"), x, y, options.stepWidth());
+                    control(Action.THEME_NEXT, text("settings.next"), x + options.controlWidth() - options.stepWidth(), y, options.stepWidth());
+                    themeValue = label(x + options.controlWidth() / 2, y + options.rowHeight() / 2, options.textHeight(), PANEL + 1, Component.empty());
+                }
                 case "settings.volume" -> {
                     double x = options.controlX();
-                    control(Action.VOLUME_DOWN, texts.text("board.zoom-out"), x, y, options.stepWidth());
-                    control(Action.VOLUME_UP, texts.text("board.zoom-in"), x + options.controlWidth() - options.stepWidth(), y, options.stepWidth());
+                    control(Action.VOLUME_DOWN, text("board.zoom-out"), x, y, options.stepWidth());
+                    control(Action.VOLUME_UP, text("board.zoom-in"), x + options.controlWidth() - options.stepWidth(), y, options.stepWidth());
                     volumeValue = label(x + options.controlWidth() / 2, y + options.rowHeight() / 2, options.textHeight(), PANEL + 1, Component.empty());
                 }
                 case "settings.sound" -> toggles.put(Action.SOUND, control(Action.SOUND, Component.empty(), options.controlX(), y, options.controlWidth()));
@@ -242,13 +251,24 @@ final class View {
         toggle(Action.CONFETTI, prefs.confetti);
         toggle(Action.GLOW, prefs.glow);
         toggle(Action.MOTION, prefs.animations);
-        Component value = texts.text("settings.value", "%value%", prefs.volume);
+        Component value = text("settings.value", "%value%", prefs.volume);
         volumeValue.set(d -> d.text(value));
+        String key = "settings.themes." + theme.id();
+        Component name = texts.has(key) ? text(key) : theme.recolor(texts.text("settings.theme-name", "%name%", theme.id()));
+        themeValue.set(d -> d.text(name));
+    }
+
+    private Component text(String key) {
+        return theme.recolor(texts.text(key));
+    }
+
+    private Component text(String key, String placeholder, Object value) {
+        return theme.recolor(texts.text(key, placeholder, value));
     }
 
     private void toggle(Action action, boolean on) {
         Button button = toggles.get(action);
-        Component text = texts.text(on ? "settings.enabled" : "settings.disabled");
+        Component text = text(on ? "settings.enabled" : "settings.disabled");
         button.label.set(d -> d.text(text));
         button.dim = !on;
         button.paint();
@@ -268,7 +288,7 @@ final class View {
         double thickness = area.height() * BAR_THICKNESS;
         double top = area.centerY() - thickness * (BARS * 2 - 1) / 2;
         for (int bar = 0; bar < BARS; bar++) {
-            rect(new Settings.Area(area.centerX() - width / 2, top + bar * thickness * 2, width, thickness), PANEL + 1, settings.settingsButtonColor);
+            rect(new Settings.Area(area.centerX() - width / 2, top + bar * thickness * 2, width, thickness), PANEL + 1, theme.settingsButton());
         }
     }
 
@@ -303,17 +323,17 @@ final class View {
         double gap = settings.menu.cellGap();
         double span = previewSpan(size, cell);
         double reference = settings.cellSize(settings.referenceSize);
-        rect(new Settings.Area(x, y, span, span), PANEL + 1, settings.boardColor);
+        rect(new Settings.Area(x, y, span, span), PANEL + 1, theme.board());
         for (int i = 0; i < size * size; i++) {
             double centerX = x + gap + (i % size) * (cell + gap) + cell / 2;
             double centerY = y + gap + (i / size) * (cell + gap) + cell / 2;
             Settings.Area area = new Settings.Area(centerX - cell / 2, centerY - cell / 2, cell, cell);
             int value = values.length == size * size ? values[i] : 0;
             if (value == 0) {
-                rect(area, GLOW, settings.cellColor);
+                rect(area, GLOW, theme.cell());
                 continue;
             }
-            Settings.TileColors colors = settings.tileColors(value);
+            Settings.TileColors colors = theme.tile(value);
             rect(area, TILE, colors.background());
             label(centerX, centerY, settings.tileTextHeight(value) * cell / reference, TILE_TEXT, tileText(value, colors));
         }
@@ -322,15 +342,15 @@ final class View {
     private void page(String hint) {
         double backdrop = settings.backdropSize;
         rect(new Settings.Area((settings.pageWidth - backdrop) / 2, (settings.pageHeight - backdrop) / 2, backdrop, backdrop), BACKDROP, settings.backdropColor);
-        rect(new Settings.Area(0, 0, settings.pageWidth, settings.pageHeight), PAGE, settings.pageColor);
-        label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, PAGE, texts.text(hint));
+        rect(new Settings.Area(0, 0, settings.pageWidth, settings.pageHeight), PAGE, theme.page());
+        label(settings.pageWidth / 2, settings.hintY, settings.hintTextHeight, PAGE, text(hint));
     }
 
     private void cursor() {
         double size = settings.cursorSize;
         double inner = size - settings.cursorBorder * 2;
-        cursor = rect(new Settings.Area(0, 0, size, size), CURSOR, settings.cursorBorderColor);
-        cursorInner = rect(new Settings.Area(0, 0, inner, inner), CURSOR + 1, settings.cursorColor);
+        cursor = rect(new Settings.Area(0, 0, size, size), CURSOR, theme.cursorBorder());
+        cursorInner = rect(new Settings.Area(0, 0, inner, inner), CURSOR + 1, theme.cursor());
     }
 
     void tick() {
@@ -385,19 +405,19 @@ final class View {
     void score(int score, int best, int gained) {
         if (score != shownScore) {
             shownScore = score;
-            Component text = texts.text("board.value", "%value%", score);
+            Component text = text("board.value", "%value%", score);
             scoreValue.set(d -> d.text(text));
         }
         if (best != shownBest) {
             shownBest = best;
-            Component text = texts.text("board.value", "%value%", best);
+            Component text = text("board.value", "%value%", best);
             bestValue.set(d -> d.text(text));
         }
         if (gained <= 0 || !prefs.animations) return;
         Settings.Area area = settings.score.area();
         double x = area.centerX();
         double y = area.y() + settings.score.valueY();
-        Part floating = label(x, y, settings.floatTextHeight, FLOAT, texts.text("board.float", "%value%", gained));
+        Part floating = label(x, y, settings.floatTextHeight, FLOAT, text("board.float", "%value%", gained));
         later(1, () -> floating.animate(settings.floatTicks, d -> {
             d.setTransformation(labelTransform(x, y - settings.floatDistance, settings.floatTextHeight, FLOAT, 1));
             d.setTextOpacity(FADED);
@@ -515,11 +535,11 @@ final class View {
 
     private void showOverlay(Overlay next, boolean canUndo) {
         Settings.Area board = settings.board;
-        Color color = over(next == Overlay.WON ? settings.overlayWon : settings.overlayOver, settings.boardColor);
+        Color color = over(next == Overlay.WON ? theme.overlayWon() : theme.overlayOver(), theme.board());
         Part background = rect(board, OVERLAY, color);
         overlayParts.add(background);
         Part text = label(board.centerX(), board.y() + settings.overlayTextY, settings.overlayTextHeight, OVERLAY_BUTTON + 1,
-                texts.text(next == Overlay.WON ? "board.won" : "board.over"));
+                text(next == Overlay.WON ? "board.won" : "board.over"));
         overlayParts.add(text);
         List<Action> actions = new ArrayList<>();
         if (next == Overlay.WON) actions.add(Action.KEEP_GOING);
@@ -545,8 +565,8 @@ final class View {
 
     private Part scoreBox(Settings.ScoreBox box, String labelKey) {
         Settings.Area area = box.area();
-        rect(area, PANEL, box.color());
-        label(area.centerX(), area.y() + box.labelY(), box.labelHeight(), CELL, texts.text(labelKey));
+        rect(area, PANEL, box == settings.best ? theme.best() : theme.score());
+        label(area.centerX(), area.y() + box.labelY(), box.labelHeight(), CELL, text(labelKey));
         return label(area.centerX(), area.y() + box.valueY(), box.valueHeight(), CELL, Component.empty());
     }
 
@@ -557,7 +577,7 @@ final class View {
     }
 
     private Tile tile(int value, int cell, float scale) {
-        Settings.TileColors colors = settings.tileColors(value);
+        Settings.TileColors colors = theme.tile(value);
         double size = settings.cellSize(side);
         double height = settings.tileTextHeight(value) * fit;
         Part glow = value < settings.glowFrom || !prefs.glow ? null : glow(value, cell, scale);
@@ -578,7 +598,7 @@ final class View {
 
     private void paint(Tile tile, int value) {
         tile.value = value;
-        Settings.TileColors colors = settings.tileColors(value);
+        Settings.TileColors colors = theme.tile(value);
         Component text = tileText(value, colors);
         Color glow = glowColor(value);
         if (tile.glow != null) tile.glow.set(d -> d.setBackgroundColor(glow));
@@ -602,7 +622,7 @@ final class View {
         double step = Math.min(1, Math.log(value / (double) settings.glowFrom) / Math.log(2) / Math.max(1, steps));
         double share = settings.glowMinAlpha + (settings.glowMaxAlpha - settings.glowMinAlpha) * step;
         int alpha = (int) Math.round(255 * share);
-        return over(Color.fromARGB(alpha, settings.glowColor.getRed(), settings.glowColor.getGreen(), settings.glowColor.getBlue()), settings.boardColor);
+        return over(Color.fromARGB(alpha, theme.glow().getRed(), theme.glow().getGreen(), theme.glow().getBlue()), theme.board());
     }
 
     private static Color over(Color top, Color bottom) {

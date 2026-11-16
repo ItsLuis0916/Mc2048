@@ -12,6 +12,7 @@ player-defaults:
   confetti: true
   glow: true
   animations: true
+  theme: classic
 
 camera:
   distance: 3.2
@@ -122,8 +123,8 @@ layout:
   prefs:
     title-y: 100
     title-height: 40
-    row-y: 190
-    row-gap: 80
+    row-y: 175
+    row-gap: 74
     row-height: 46
     label-x: 160
     label-height: 14
@@ -211,6 +212,129 @@ layout:
       1024: ['#edc53f', '#f9f6f2']
       2048: ['#edc22e', '#f9f6f2']
       super: ['#3c3a32', '#f9f6f2']
+
+themes:
+  classic: {}
+  dark:
+    page: '#1e1f26'
+    board: '#2c2f3a'
+    cell: '#3a3e4b'
+    score: '#2c2f3a'
+    button: '#4c566a'
+    button-hover: '#5e6a82'
+    button-disabled: '#2f333d'
+    settings-button: '#d8dee9'
+    overlay-won: '#8088c0d0'
+    overlay-over: '#c01e1f26'
+    glow: '#88c0d0'
+    cursor: '#ffffff'
+    cursor-border: '#5e6a82'
+    text:
+      '#776e65': '#d8dee9'
+      '#eee4da': '#aab2c0'
+    tiles:
+      2: ['#3b4252', '#d8dee9']
+      4: ['#434c5e', '#e5e9f0']
+      8: ['#5e81ac', '#ffffff']
+      16: ['#4c8bbf', '#ffffff']
+      32: ['#3a9bc4', '#ffffff']
+      64: ['#2a9d8f', '#ffffff']
+      128: ['#a3be8c', '#1e1f26']
+      256: ['#ebcb8b', '#1e1f26']
+      512: ['#d08770', '#ffffff']
+      1024: ['#bf616a', '#ffffff']
+      2048: ['#b48ead', '#ffffff']
+      super: ['#eceff4', '#1e1f26']
+  ocean:
+    page: '#eef6fb'
+    board: '#9fb8c8'
+    cell: '#bfd3df'
+    score: '#7f9db1'
+    button: '#3d6e8f'
+    button-hover: '#4c84aa'
+    button-disabled: '#c9d8e2'
+    settings-button: '#eef6fb'
+    overlay-won: '#807fd3ff'
+    overlay-over: '#baeef6fb'
+    glow: '#7fd3ff'
+    cursor: '#ffffff'
+    cursor-border: '#2f5673'
+    text:
+      '#776e65': '#2f5673'
+      '#eee4da': '#eef6fb'
+    tiles:
+      2: ['#e3eef5', '#2f5673']
+      4: ['#cfe4f1', '#2f5673']
+      8: ['#5fb4dd', '#ffffff']
+      16: ['#3fa0d6', '#ffffff']
+      32: ['#2b86c6', '#ffffff']
+      64: ['#1f6aac', '#ffffff']
+      128: ['#3bb8a8', '#ffffff']
+      256: ['#26a596', '#ffffff']
+      512: ['#1a8f82', '#ffffff']
+      1024: ['#12776f', '#ffffff']
+      2048: ['#0d5f73', '#ffffff']
+      super: ['#0a2a3d', '#eef6fb']
+  forest:
+    page: '#f3f6ee'
+    board: '#a9b89a'
+    cell: '#c8d3bc'
+    score: '#8fa17e'
+    button: '#5b7a4a'
+    button-hover: '#6c8f59'
+    button-disabled: '#d3dcc8'
+    settings-button: '#f3f6ee'
+    overlay-won: '#80d6e86b'
+    overlay-over: '#baf3f6ee'
+    glow: '#d6e86b'
+    cursor: '#ffffff'
+    cursor-border: '#3f5634'
+    text:
+      '#776e65': '#3f5634'
+      '#eee4da': '#f3f6ee'
+    tiles:
+      2: ['#e8eedf', '#3f5634']
+      4: ['#dbe6c9', '#3f5634']
+      8: ['#8fb85c', '#ffffff']
+      16: ['#76a648', '#ffffff']
+      32: ['#5e9338', '#ffffff']
+      64: ['#467d2a', '#ffffff']
+      128: ['#c4ad4c', '#ffffff']
+      256: ['#b99a37', '#ffffff']
+      512: ['#ab842b', '#ffffff']
+      1024: ['#966b22', '#ffffff']
+      2048: ['#7e5418', '#ffffff']
+      super: ['#2b3a24', '#f3f6ee']
+  candy:
+    page: '#fdf2f7'
+    board: '#d9a7c0'
+    cell: '#ebc8d9'
+    score: '#c98aaa'
+    button: '#a64d79'
+    button-hover: '#bd5d8c'
+    button-disabled: '#efd3e1'
+    settings-button: '#fdf2f7'
+    overlay-won: '#80ff9ed2'
+    overlay-over: '#bafdf2f7'
+    glow: '#ff9ed2'
+    cursor: '#ffffff'
+    cursor-border: '#7a2e55'
+    text:
+      '#776e65': '#7a2e55'
+      '#eee4da': '#fdf2f7'
+    tiles:
+      2: ['#f8e1ec', '#7a2e55']
+      4: ['#f4d0e2', '#7a2e55']
+      8: ['#f08ab8', '#ffffff']
+      16: ['#ea6fa8', '#ffffff']
+      32: ['#e05696', '#ffffff']
+      64: ['#cf3b80', '#ffffff']
+      128: ['#b07fe3', '#ffffff']
+      256: ['#9a67da', '#ffffff']
+      512: ['#8352cf', '#ffffff']
+      1024: ['#6c3dbe', '#ffffff']
+      2048: ['#5a2ea8', '#ffffff']
+      super: ['#2e1640', '#fdf2f7']
 
 sounds:
   merge-pitch-step: 0.1

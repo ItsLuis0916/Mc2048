@@ -4,13 +4,16 @@ import net.kyori.adventure.key.Key;
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Color;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,9 +32,26 @@ public final class Settings {
         }
     }
 
-    public record ScoreBox(Area area, Color color, double labelY, double labelHeight, double valueY, double valueHeight) {}
+    public record ScoreBox(Area area, double labelY, double labelHeight, double valueY, double valueHeight) {}
 
     public record TileColors(Color background, Color text) {}
+
+    public record Theme(String id, Color page, Color board, Color cell, Color score, Color best, Color button, Color buttonHover,
+                        Color buttonDisabled, Color settingsButton, Color overlayWon, Color overlayOver, Color glow, Color cursor,
+                        Color cursorBorder, Map<Integer, TileColors> tiles, TileColors superTile, Map<Integer, TextColor> text) {
+
+        public TileColors tile(int value) {
+            return tiles.getOrDefault(value, superTile);
+        }
+
+        public Component recolor(Component component) {
+            if (text.isEmpty()) return component;
+            TextColor mapped = component.color() == null ? null : text.get(component.color().value());
+            Component result = mapped == null ? component : component.color(mapped);
+            List<Component> children = result.children();
+            return children.isEmpty() ? result : result.children(children.stream().map(this::recolor).toList());
+        }
+    }
 
     public record Options(double titleY, double titleHeight, double rowY, double rowGap, double rowHeight, double labelX,
                           double labelHeight, double controlX, double controlWidth, double stepWidth, double textHeight) {}
@@ -44,6 +64,7 @@ public final class Settings {
     private static final int MAX_SIZE = 16;
     private static final int MAX_MENU_SIZES = 4;
     private static final int DEFAULT_SIZE = 4;
+    private static final String DEFAULT_THEME = "classic";
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.builder()
             .character('&').hexColors().build();
     private static final TextReplacementConfig KEYBINDS = TextReplacementConfig.builder()
@@ -83,7 +104,6 @@ public final class Settings {
     public final double layer;
     public final double pageWidth;
     public final double pageHeight;
-    public final Color pageColor;
     public final Area title;
     public final double titleHeight;
     public final ScoreBox score;
@@ -94,21 +114,13 @@ public final class Settings {
     public final double restartTextHeight;
     public final Area leave;
     public final double leaveTextHeight;
-    public final Color buttonColor;
-    public final Color buttonHover;
-    public final Color buttonDisabled;
     public final Area board;
     private final double gap;
     public final Menu menu;
     public final Options options;
     public final Area settingsButton;
-    public final Color settingsButtonColor;
     public final Prefs defaults;
     public final int volumeStep;
-    public final Color boardColor;
-    public final Color cellColor;
-    public final Color overlayWon;
-    public final Color overlayOver;
     public final double overlayTextY;
     public final double overlayTextHeight;
     public final double overlayButtonY;
@@ -126,7 +138,6 @@ public final class Settings {
     public final int confettiFallTicks;
     public final List<Color> confettiColors = new ArrayList<>();
     public final int glowFrom;
-    public final Color glowColor;
     public final double glowMinAlpha;
     public final double glowMaxAlpha;
     public final double glowMargin;
@@ -139,12 +150,10 @@ public final class Settings {
     public final double zoomTextHeight;
     public final double cursorSize;
     public final double cursorBorder;
-    public final Color cursorColor;
-    public final Color cursorBorderColor;
+    public final List<Theme> themes;
+    private final Map<String, Theme> themesById = new LinkedHashMap<>();
 
     private final TreeMap<Integer, Double> tileTextHeights = new TreeMap<>();
-    private final Map<Integer, TileColors> tileColors = new HashMap<>();
-    private final TileColors superTile;
     private final Map<String, List<Sound>> sounds = new HashMap<>();
     public final float mergePitchStep;
     public final float mergePitchMax;
@@ -157,6 +166,10 @@ public final class Settings {
 
         private Texts(FileConfiguration messages) {
             this.messages = messages;
+        }
+
+        public boolean has(String path) {
+            return messages.isString(path);
         }
 
         public Component text(String path) {
@@ -205,7 +218,6 @@ public final class Settings {
         layer = layout.getDouble("layer");
         pageWidth = layout.getDouble("page.width");
         pageHeight = layout.getDouble("page.height");
-        pageColor = color(layout.getString("page.color"));
         title = area(layout.getConfigurationSection("title"));
         titleHeight = layout.getDouble("title.text-height");
         score = scoreBox(layout.getConfigurationSection("score"));
@@ -216,17 +228,10 @@ public final class Settings {
         restartTextHeight = layout.getDouble("restart.text-height");
         leave = area(layout.getConfigurationSection("leave"));
         leaveTextHeight = layout.getDouble("leave.text-height");
-        buttonColor = color(layout.getString("button.color"));
-        buttonHover = color(layout.getString("button.hover"));
-        buttonDisabled = color(layout.getString("button.disabled"));
         double boardSize = layout.getDouble("board.size");
         board = new Area(layout.getDouble("board.x"), layout.getDouble("board.y"), boardSize, boardSize);
         gap = layout.getDouble("board.gap");
         referenceSize = Math.max(1, layout.getInt("board.reference-size"));
-        boardColor = color(layout.getString("board.color"));
-        cellColor = color(layout.getString("board.cell"));
-        overlayWon = color(layout.getString("overlay.won"));
-        overlayOver = color(layout.getString("overlay.over"));
         overlayTextY = layout.getDouble("overlay.text-y");
         overlayTextHeight = layout.getDouble("overlay.text-height");
         overlayButtonY = layout.getDouble("overlay.button-y");
@@ -244,7 +249,6 @@ public final class Settings {
         confettiFallTicks = config.getInt("animation.confetti.fall-ticks");
         for (String hex : config.getStringList("animation.confetti.colors")) confettiColors.add(color(hex));
         glowFrom = Math.max(1, layout.getInt("tiles.glow.from"));
-        glowColor = color(layout.getString("tiles.glow.color"));
         glowMinAlpha = layout.getDouble("tiles.glow.min-alpha");
         glowMaxAlpha = layout.getDouble("tiles.glow.max-alpha");
         glowMargin = layout.getDouble("tiles.glow.margin");
@@ -266,30 +270,32 @@ public final class Settings {
                 prefs.getDouble("label-height"), prefs.getDouble("control-x"), prefs.getDouble("control-width"),
                 prefs.getDouble("step-width"), prefs.getDouble("text-height"));
         settingsButton = area(layout.getConfigurationSection("settings-button"));
-        settingsButtonColor = color(layout.getString("settings-button.color"));
         ConfigurationSection player = config.getConfigurationSection("player-defaults");
         defaults = new Prefs(player.getBoolean("sound"), player.getInt("volume"), player.getBoolean("confetti"),
-                player.getBoolean("glow"), player.getBoolean("animations"));
+                player.getBoolean("glow"), player.getBoolean("animations"), player.getString("theme", ""));
         volumeStep = Math.max(1, player.getInt("volume-step"));
         zoomIn = area(layout.getConfigurationSection("zoom-in"));
         zoomOut = area(layout.getConfigurationSection("zoom-out"));
         zoomTextHeight = layout.getDouble("zoom-in.text-height");
         cursorSize = layout.getDouble("cursor.size");
         cursorBorder = layout.getDouble("cursor.border");
-        cursorColor = color(layout.getString("cursor.color"));
-        cursorBorderColor = color(layout.getString("cursor.border-color"));
 
         ConfigurationSection heights = layout.getConfigurationSection("tiles.text-height");
         for (String digits : heights.getKeys(false)) tileTextHeights.put(Integer.parseInt(digits), heights.getDouble(digits));
-        ConfigurationSection colors = layout.getConfigurationSection("tiles.colors");
-        TileColors fallback = null;
-        for (String value : colors.getKeys(false)) {
-            List<String> pair = colors.getStringList(value);
-            TileColors tile = new TileColors(color(pair.get(0)), color(pair.get(1)));
-            if (value.equals("super")) fallback = tile;
-            else tileColors.put(Integer.parseInt(value), tile);
+        Map<Integer, TileColors> tiles = new HashMap<>();
+        TileColors top = tiles(layout.getConfigurationSection("tiles.colors"), tiles, null);
+        Theme base = new Theme("", color(layout.getString("page.color")), color(layout.getString("board.color")),
+                color(layout.getString("board.cell")), color(layout.getString("score.color")), color(layout.getString("best.color")),
+                color(layout.getString("button.color")), color(layout.getString("button.hover")), color(layout.getString("button.disabled")),
+                color(layout.getString("settings-button.color")), color(layout.getString("overlay.won")), color(layout.getString("overlay.over")),
+                color(layout.getString("tiles.glow.color")), color(layout.getString("cursor.color")), color(layout.getString("cursor.border-color")),
+                tiles, top, Map.of());
+        ConfigurationSection themeSection = config.getConfigurationSection("themes");
+        if (themeSection != null) {
+            for (String id : themeSection.getKeys(false)) themesById.put(id, theme(id, themeSection.getConfigurationSection(id), base));
         }
-        superTile = fallback;
+        if (themesById.isEmpty()) themesById.put(DEFAULT_THEME, theme(DEFAULT_THEME, null, base));
+        themes = List.copyOf(themesById.values());
 
         ConfigurationSection soundSection = config.getConfigurationSection("sounds.events");
         for (String event : soundSection.getKeys(false)) {
@@ -328,8 +334,13 @@ public final class Settings {
         return sounds.getOrDefault(event, List.of());
     }
 
-    public TileColors tileColors(int value) {
-        return tileColors.getOrDefault(value, superTile);
+    public Theme theme(String id) {
+        return themesById.getOrDefault(id, themes.getFirst());
+    }
+
+    public String shiftTheme(String id, int step) {
+        int index = themes.indexOf(theme(id));
+        return themes.get(Math.floorMod(index + step, themes.size())).id();
     }
 
     public Texts texts(Locale locale) {
@@ -345,8 +356,42 @@ public final class Settings {
     }
 
     private static ScoreBox scoreBox(ConfigurationSection section) {
-        return new ScoreBox(area(section), color(section.getString("color")), section.getDouble("label-y"),
+        return new ScoreBox(area(section), section.getDouble("label-y"),
                 section.getDouble("label-height"), section.getDouble("value-y"), section.getDouble("value-height"));
+    }
+
+    private static TileColors tiles(ConfigurationSection section, Map<Integer, TileColors> into, TileColors top) {
+        if (section == null) return top;
+        for (String value : section.getKeys(false)) {
+            List<String> pair = section.getStringList(value);
+            if (pair.size() < 2) continue;
+            TileColors tile = new TileColors(color(pair.get(0)), color(pair.get(1)));
+            if (value.equals("super")) top = tile;
+            else if (value.matches("\\d{1,9}")) into.put(Integer.parseInt(value), tile);
+        }
+        return top;
+    }
+
+    private static Theme theme(String id, ConfigurationSection section, Theme base) {
+        if (section == null) section = new MemoryConfiguration();
+        Map<Integer, TileColors> tiles = new HashMap<>(base.tiles());
+        TileColors top = tiles(section.getConfigurationSection("tiles"), tiles, base.superTile());
+        Map<Integer, TextColor> text = new HashMap<>();
+        ConfigurationSection mapping = section.getConfigurationSection("text");
+        if (mapping != null) {
+            for (String from : mapping.getKeys(false)) text.put(color(from).asRGB(), TextColor.color(color(mapping.getString(from)).asRGB()));
+        }
+        Color score = pick(section, "score", base.score());
+        return new Theme(id, pick(section, "page", base.page()), pick(section, "board", base.board()), pick(section, "cell", base.cell()),
+                score, pick(section, "score", base.best()), pick(section, "button", base.button()),
+                pick(section, "button-hover", base.buttonHover()), pick(section, "button-disabled", base.buttonDisabled()),
+                pick(section, "settings-button", base.settingsButton()), pick(section, "overlay-won", base.overlayWon()),
+                pick(section, "overlay-over", base.overlayOver()), pick(section, "glow", base.glow()), pick(section, "cursor", base.cursor()),
+                pick(section, "cursor-border", base.cursorBorder()), Map.copyOf(tiles), top, Map.copyOf(text));
+    }
+
+    private static Color pick(ConfigurationSection section, String key, Color fallback) {
+        return section.isString(key) ? color(section.getString(key)) : fallback;
     }
 
     private static Color color(String hex) {

@@ -23,6 +23,7 @@ board:
 
 settings:
   title: '&#776e65&lSettings'
+  theme: '&#776e65&lColour style'
   sound: '&#776e65&lSound'
   volume: '&#776e65&lVolume'
   confetti: '&#776e65&lConfetti'
@@ -32,6 +33,15 @@ settings:
   disabled: '&#776e65&lOff'
   value: '&#776e65&l%value%%'
   hint: '&#f9f6f2Click to change  &#776e65|  &#f9f6f2Sneak to leave'
+  previous: '&#f9f6f2&l<'
+  next: '&#f9f6f2&l>'
+  theme-name: '&#776e65&l%name%'
+  themes:
+    classic: '&#776e65&lClassic'
+    dark: '&#776e65&lNight'
+    ocean: '&#776e65&lOcean'
+    forest: '&#776e65&lForest'
+    candy: '&#776e65&lCandy'
 
 menu:
   subtitle: '&#776e65&lChoose a size'

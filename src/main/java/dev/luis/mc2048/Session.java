@@ -196,7 +196,7 @@ final class Session {
                 closeSettings();
                 return;
             }
-            case SOUND, VOLUME_DOWN, VOLUME_UP, CONFETTI, GLOW, MOTION -> {
+            case SOUND, VOLUME_DOWN, VOLUME_UP, CONFETTI, GLOW, MOTION, THEME_PREVIOUS, THEME_NEXT -> {
                 change(action);
                 return;
             }
@@ -277,12 +277,15 @@ final class Session {
             case CONFETTI -> prefs.confetti = !prefs.confetti;
             case GLOW -> prefs.glow = !prefs.glow;
             case MOTION -> prefs.animations = !prefs.animations;
+            case THEME_PREVIOUS -> prefs.theme = settings.shiftTheme(prefs.theme, -1);
+            case THEME_NEXT -> prefs.theme = settings.shiftTheme(prefs.theme, 1);
             default -> {
                 return;
             }
         }
         prefsDirty = true;
-        view.options();
+        if (action == View.Action.THEME_PREVIOUS || action == View.Action.THEME_NEXT) openSettings();
+        else view.options();
     }
 
     private void saveSettings() {
